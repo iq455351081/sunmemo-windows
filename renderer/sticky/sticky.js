@@ -76,16 +76,25 @@ api.invoke('sticky:data', id).then(item => {
     document.body.classList.add('photo');
     title.textContent = decodeURIComponent((item.fileUrl || '').split('/').pop() || '').slice(0, 20);
     content.innerHTML = `<img src="${item.fileUrl}" alt="">`;
+    // 图片丢失（文件被移动/删除）时不留破图：文案占位（sticky 页无 reveal 通道，不提供按钮）。
+    const img = content.querySelector('img');
+    if (img) img.addEventListener('error', () => {
+      content.innerHTML = '<div class="img-err"><div class="ico">🖼</div><div>图片无法加载（文件可能已被移动或删除）</div></div>';
+    });
   }
 }).catch(() => {});
 
 function back() { api.send('sticky:return', id); }
+function hide() { back(); } // R167: 单一出口语义——✕ 也是放回，避免桌面标记悬挂丢失
 document.getElementById('backBtn').addEventListener('click', back);
-document.getElementById('closeBtn').addEventListener('click', back);
+document.getElementById('closeBtn').addEventListener('click', hide);
 window.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.ctrlKey && editing) { e.preventDefault(); content.blur(); return; }
-  if (e.key === 'Escape') { if (editing) { content.blur(); } else back(); }
-  if (e.key === 'Escape') closeMenu();
+  if (e.key === 'Escape') {
+    if (menuEl) { closeMenu(); return; } // 右键菜单打开时 Esc 只关菜单，不放回便签
+    if (editing) { content.blur(); } else back();
+    return;
+  }
 });
 
 /* R151: 文字便签右键小菜单 —— 置顶切换 / 半透明切换 / 放回晾衣绳。

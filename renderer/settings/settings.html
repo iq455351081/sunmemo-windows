@@ -40,7 +40,7 @@
         <input type="checkbox" id="chkSound">
         <span><span class="ct">声效</span><br><span class="cs">挂绳、打勾与撕下便签时的轻巧音效。</span></span>
       </label>
-      <div class="chk-row" style="align-items:center">
+      <div class="chk-row inline">
         <span class="ct" style="min-width:64px">主题色</span>
         <div id="themeRow" style="display:flex;gap:8px"></div>
       </div>
@@ -68,15 +68,16 @@
         <input type="checkbox" id="chkWind">
         <span><span class="ct">环境风声</span><br><span class="cs">极轻的白噪声循环，营造晾衣绳的户外感。</span></span>
       </label>
-      <div class="chk-row" style="align-items:center">
+      <div class="chk-row inline">
         <span class="ct" style="min-width:64px">卡片字号</span>
         <div id="fontRow" style="display:flex;gap:6px"></div>
+        <span class="cs">绳上按住 Ctrl + 滚轮也可调字号</span>
       </div>
-      <div class="chk-row" style="align-items:center">
+      <div class="chk-row inline">
         <span class="ct" style="min-width:64px">外观</span>
         <button id="resetAppearance" style="font-family:inherit;font-size:11px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;padding:4px 12px;cursor:pointer;background:#fff">恢复默认外观</button>
       </div>
-      <div class="chk-row" style="align-items:center">
+      <div class="chk-row inline">
         <span class="ct" style="min-width:64px">音量</span>
         <input type="range" id="vol" min="10" max="100" step="5" aria-label="音量" style="flex:1;accent-color:#0a84ff">
         <span class="cs" id="volLabel" style="min-width:36px"></span>

@@ -849,6 +849,9 @@ api.on('settings-volume', v => {
   if (windNodes) windNodes.g.gain.linearRampToValueAtTime(0.02 * curVol / 0.6, ctxA().currentTime + 0.5);
 });
 api.on('beacon-fly', d => {
+  // R167: reduced-motion 时跳过——小太阳飞行纯属视觉连续性（main 侧
+  // revealLinePinned 已先行完成展开，这里没有等价的 store 收尾可做）
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const fly = document.createElement('div');
   fly.textContent = '\u2600\ufe0f';
   fly.style.cssText = 'position:fixed;z-index:300000;font-size:22px;pointer-events:none;transition:transform 520ms cubic-bezier(0.3,0.9,0.4,1),opacity 520ms ease;';
@@ -889,6 +892,8 @@ api.on('hint-toast', showHintToast);
 // R?: main.js 在新建/复制/截图生成便签后发送 'card-flash'（带 id）——
 // 此前无监听，line.css 里的高亮光圈 .card-flash-ring 从未渲染过。
 api.on('card-flash', id => {
+  // R167: reduced-motion 时高亮光圈直接不做（纯视觉强调，无状态跟随）
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const sl = slots.get(id);
   if (!sl || !sl.el) return;
   const ring = document.createElement('div');

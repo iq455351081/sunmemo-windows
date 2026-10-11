@@ -97,7 +97,7 @@ function render() {
   if (!filtered.length) {
     const canCreate = true; // R103: includeRecycle was never defined — the empty state threw ReferenceError
     list.innerHTML = histHtml
-      + `<div class="empty">${query ? '没有匹配的便签' : '绳上还没有便签'}</div>`
+      + `<div class="empty">${query ? '没有匹配的便签' : activeTag ? `没有带 #${esc(activeTag)} 的便签` : '绳上还没有便签'}</div>`
       + (canCreate && !query ? '<div class="empty" style="padding-top:0"><button class="quick-create" data-action="create">＋ 新建速记便签 (Ctrl+Alt+N)</button></div>' : '');
     return;
   }
@@ -194,3 +194,6 @@ if (typeof allTags !== 'function') {
     return [...set].slice(0, 10);
   };
 }
+
+// R167: 窗口入场 —— ready-to-show 后补 .in 触发 search.css 的 #panel 展开过渡
+requestAnimationFrame(() => document.body.classList.add('in'));

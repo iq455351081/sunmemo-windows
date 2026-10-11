@@ -276,9 +276,12 @@ function resetEditor() {
     setTimeout(() => {
       const t = document.createElement('div');
       t.textContent = '已恢复上次未提交的草稿';
-      t.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:4px 12px;border-radius:8px;z-index:9;';
+      // R167: 与 line.js torn-toast 同款入场/淡出。memo.css 无 toast-in keyframes，
+      // 改用元素内联 opacity 过渡 + 两段 setTimeout：入场 300ms，停留 2s，300ms 淡出后移除。
+      t.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:4px 12px;border-radius:8px;z-index:9;opacity:0;transition:opacity 300ms ease;';
       sheet.appendChild(t);
-      setTimeout(() => t.remove(), 2600);
+      setTimeout(() => { t.style.opacity = '1'; }, 20);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 320); }, 2300);
     }, 60);
   }
   sheet.classList.remove('color-green', 'color-pink', 'color-blue');
@@ -311,3 +314,6 @@ api.on('memo:demo-fill', () => {
 
 syncText();
 editor.focus();
+// R167: 窗口入场 —— ready-to-show 后补 .in 触发 memo.css 的 #sheet 展开过渡
+// （窗口隐藏期间 rAF 不触发，类在首次 show 后的首帧才加上，正好是入场时机）
+requestAnimationFrame(() => document.body.classList.add('in'));

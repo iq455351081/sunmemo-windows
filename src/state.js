@@ -440,6 +440,9 @@ class LineStore {
     if (item.kind === 'memo') {
       if (this.onArchive) this.onArchive(item);
       try { fs.rmSync(item.url, { force: true }); } catch { /* ignore */ }
+      // Memo trash used to be silent while image trash played — give it the
+      // same 'trash' cue (softer). The drop below stays quiet, so no double.
+      this.play('trash', 0.25);
       this.drop(id, { quietly: true });
       return;
     }

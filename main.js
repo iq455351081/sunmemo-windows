@@ -1036,10 +1036,19 @@ function buildTrayMenu() {
     { type: 'separator' },
   );
 
-  // ♻️ 回收站：最近撕下的便签可一键恢复（与"全部取下"同属内容管理组）
+  // ♻️ 回收站：最近撕下的便签可一键恢复（与"全部撕下"同属内容管理组）
   if (sync.archived.length > 0) {
     const recycleChildren = [
-      { label: '🗑 清空回收站', click: () => { sync.archived = []; sync.saveArchived(); refreshTray(); } },
+      // 破坏性操作保护：清空前二次确认（取消为默认按钮，误触即止）
+      { label: '🗑 清空回收站', click: async () => {
+          const { dialog } = require('electron');
+          const r = await dialog.showMessageBox({
+            type: 'warning', buttons: ['清空', '取消'], defaultId: 1, cancelId: 1,
+            message: '清空回收站？', detail: '将永久删除全部归档便签，无法恢复。',
+          });
+          if (r.response !== 0) return;
+          sync.archived = []; sync.saveArchived(); refreshTray();
+        } },
       { label: '📂 打开回收站文件夹', click: () => shell.openPath(sync.archivePath) },
       { type: 'separator' },
     ];
@@ -1076,8 +1085,20 @@ function buildTrayMenu() {
   }
   items.push(
     {
-      label: '全部取下', enabled: store.liveCount() > 0,
-      click: () => store.clear(),
+      label: '全部撕下', enabled: store.liveCount() > 0,
+      // 破坏性操作保护：撕下前二次确认；绳上有图片时提示图片不会被归档
+      click: async () => {
+        if (store.liveCount() === 0) return;
+        const { dialog } = require('electron');
+        const hasImages = store.items.some(i => i.kind === 'image' && !i.falling);
+        const r = await dialog.showMessageBox({
+          type: 'warning', buttons: ['全部撕下', '取消'], defaultId: 1, cancelId: 1,
+          message: '全部撕下？',
+          detail: '便签将从绳上撕下' + (hasImages ? '，图片不会归档' : '') + '。',
+        });
+        if (r.response !== 0) return;
+        store.clear();
+      },
     },
     { type: 'separator' },
     { label: '偏好设置与快捷键...', click: showSettings },
@@ -1442,7 +1463,14 @@ async function exportMemoPng(id) {
         if (text.trim()) { store.addMemo({ text: text.slice(0, 2000), color: 'yellow' }); return; }
       } catch { /* not readable — fall through to hangCapture */ }
     }
+    // hangCapture has no return value — compare liveCount before/after as the
+    // success signal. A drop that hangs nothing must not vanish silently.
+    const before = store.liveCount();
     hangCapture(file, { flying: false });
+    if (store.liveCount() === before) {
+      store.play('beep', 0.4);
+      lineWin && !lineWin.isDestroyed() && lineWin.webContents.send('hint-toast', '暂不支持该类型的文件（支持图片 / .txt / .md）');
+    }
   });
   ipcMain.on('line:toggle-pinned', (_e, id) => store.toggleMemoPinned(id));
   ipcMain.on('line:reorder', (_e, { id, toIndex }) => store.reorder(id, toIndex));
@@ -1521,6 +1549,10 @@ async function exportMemoPng(id) {
     const w = stickies.get(id);
     if (w && !w.isDestroyed()) w.close();
   });
+  ipcMain.on('sticky:hide', (_e, id) => {
+    const w = stickies.get(id);
+    if (w && !w.isDestroyed()) w.hide();
+  });
   ipcMain.on('sticky:save-text', (_e, { id, text }) => {
     if (!text || !String(text).trim()) return;
     store.updateMemo(id, { text: String(text) });
@@ -1584,9 +1616,17 @@ async function exportMemoPng(id) {
       { label: '在资源管理器中显示', click: () => store.reveal(id) },
       { type: 'separator' },
       { label: '移到回收站', click: () => store.trash(id) },
-      { label: '取下', click: () => store.discard(id) },
     ];
-    Menu.buildFromTemplate(template).popup({ window: lineWin });
+    // lineWin 常态 focusable:false（WS_EX_NOACTIVATE，永不抢焦点）。Windows 的
+    // TrackPopupMenu 要求属主窗口处于前台，否则菜单在同一帧内被系统吞掉——
+    // 右键菜单在绳上从未真正出现过。借焦点弹菜单，popup 的关闭回调里立即归还。
+    try { lineWin.setFocusable(true); lineWin.focus(); } catch { /* ignore */ }
+    Menu.buildFromTemplate(template).popup({
+      window: lineWin,
+      callback: () => {
+        try { lineWin.blur(); lineWin.setFocusable(false); } catch { /* ignore */ }
+      },
+    });
   });
 
   // Overlay (hero preview / flights)

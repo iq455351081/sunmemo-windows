@@ -297,10 +297,12 @@ body.reordering * { cursor: grabbing !important; }
   flex: none;
 }
 .done-btn {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; border: 0; background: none; padding: 0;
   color: var(--secondary); cursor: pointer;
 }
+.done-btn::after { content: ''; position: absolute; inset: -5px; } /* 26px hit area, visuals unchanged */
 .done-btn.done { color: var(--green); }
 .done-btn svg { width: 14px; height: 14px; }
 .todo-stats {
@@ -358,6 +360,7 @@ body.reordering * { cursor: grabbing !important; }
   z-index: 5;
 }
 .discard-x svg { width: 8px; height: 8px; }
+.discard-x::after { content: ''; position: absolute; inset: -5px; } /* 28px hit area, visuals unchanged */
 .slot.hover .discard-x { opacity: 1; transform: scale(1); }
 
 /* ---- Copied badge ---------------------------------------------------------------- */
@@ -373,6 +376,7 @@ body.reordering * { cursor: grabbing !important; }
 }
 .slot.hover .hover-tools { opacity: 1; transform: none; pointer-events: auto; }
 .hover-tools .tool {
+  position: relative;
   width: 20px; height: 20px;
   border: 0; border-radius: 6px;
   background: rgba(0, 0, 0, 0.10);
@@ -381,6 +385,7 @@ body.reordering * { cursor: grabbing !important; }
   display: inline-flex; align-items: center; justify-content: center;
   transition: background 120ms ease;
 }
+.hover-tools .tool::after { content: ''; position: absolute; inset: -3px; } /* 26px hit area, visuals unchanged */
 .hover-tools .tool:hover { background: rgba(0, 0, 0, 0.20); }
 .hover-tools .tool.on { background: rgba(52, 199, 89, 0.25); }
 .hover-tools .tool.danger:hover { background: rgba(255, 69, 58, 0.30); }

@@ -64,9 +64,9 @@ function heroHTML(item) {
             <button class="act-btn ghost" data-act="copymd" title="以 Markdown 引用格式复制">MD 引用</button>
             <button class="act-btn" data-act="copy">${ICONS.copy}<span>复制全文</span></button>
             <span class="hero-spacer"></span>
-            <button class="act-btn danger" data-act="discard">${ICONS.trash}<span>撕下归档</span></button>
             <button class="act-btn ghost" data-act="inline">${ICONS.edit}<span>内联编辑</span></button>
             <button class="act-btn primary" data-act="edit">${ICONS.edit}<span>编辑便签</span></button>
+            <button class="act-btn danger" data-act="discard">${ICONS.trash}<span>撕下</span></button>
           </div>
           <div class="hero-hint">按 Esc 或点击空白处收起 · 双击卡片或按 Enter 编辑</div>
         </div>
@@ -146,6 +146,16 @@ function renderHero(item) {
   heroCard.style.width = size.w + 'px';
   heroCard.style.height = size.h + 'px';
   heroCard.innerHTML = heroHTML(item);
+  // 图片丢失（文件被移动/删除）时不再留破图：换成可读占位，"打开文件夹"
+  // 复用现有 data-act 委托 → line:reveal（shell.showItemInFolder）。
+  const heroImg = heroCard.querySelector('.photo-area img');
+  if (heroImg) heroImg.addEventListener('error', () => {
+    if (!heroImg.isConnected) return;
+    const area = heroCard.querySelector('.photo-area');
+    if (area) area.innerHTML =
+      '<div class="img-err"><div class="ico">🖼</div><div class="txt">图片无法加载（文件可能已被移动或删除）</div>' +
+      '<button class="act-btn ghost" data-act="reveal">打开文件夹</button></div>';
+  });
   const body = heroCard.querySelector('.hero-body');
   if (body && item.kind === 'memo') body.style.height = size.body + 'px';
 }
@@ -297,6 +307,7 @@ heroCard.addEventListener('click', ev => {
   }
   else if (a === 'tag') { /* handled via chip listener below */ }
   else if (a === 'open') { flashBtn(act, '打开中…'); api.send('line:open', pv.item.id); }
+  else if (a === 'reveal') { flashBtn(act, '打开文件夹…'); api.send('line:reveal', pv.item.id); }
   else if (a === 'inline' && pv.item.kind === 'memo') startInlineEdit();
 });
 
@@ -358,7 +369,7 @@ function zoomApply(area) {
   const img = area.querySelector('img');
   if (img) applyPhotoTransform(img);
   const reset = area.querySelector('.zoom-reset');
-  if (reset) reset.style.opacity = zoomTarget > 1.05 ? '1' : '0';
+  if (reset) reset.classList.toggle('show', zoomTarget > 1.05);
 }
 heroCard.addEventListener('wheel', ev => {
   const area = ev.target.closest && ev.target.closest('.photo-area');
@@ -386,7 +397,7 @@ heroCard.addEventListener('wheel', ev => {
     zoomCurrent += (zoomTarget - zoomCurrent) * 0.22;
     if (Math.abs(zoomTarget - zoomCurrent) < 0.005) zoomCurrent = zoomTarget;
     applyPhotoTransform(img);
-    if (reset) reset.style.opacity = zoomTarget > 1.05 ? '1' : '0';
+    if (reset) reset.classList.toggle('show', zoomTarget > 1.05);
     if (Math.abs(zoomTarget - zoomCurrent) > 0.001) zoomRaf = requestAnimationFrame(approach);
   })();
 }, { passive: false });

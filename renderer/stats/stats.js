@@ -68,7 +68,16 @@ function loadData(d, off = curOff) {
     rl.innerHTML = rows.length
       ? rows.map(r => `<div class="rec-row"><span class="rt">${r.text || '（空）'}</span><span class="rt2">${r.time}</span><button data-i="${r.index}" data-a="restore">恢复</button><button class="del" data-i="${r.index}" data-a="delete" title="永久删除">🗑</button></div>`).join('')
       : '<div class="rec-empty">回收站为空</div>';
+    // 永久删除两次点击确认：首击变"确认删除"（2.5s 内有效），再击才真正删除
     rl.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.a === 'delete' && !b.classList.contains('confirm')) {
+        b.classList.add('confirm');
+        b.textContent = '确认删除';
+        clearTimeout(b._ct);
+        b._ct = setTimeout(() => { b.classList.remove('confirm'); b.textContent = '🗑'; }, 2500);
+        return;
+      }
+      clearTimeout(b._ct);
       api.send(b.dataset.a === 'delete' ? 'stats:delete-archive' : 'stats:restore', Number(b.dataset.i));
       setTimeout(() => api.invoke('stats:data').then(loadData), 250);
     }));
@@ -90,3 +99,5 @@ function fetchData() {
 fetchData();
 api.on('stats:refresh', fetchData); // R103: 载荷此前为空，处理器必抛
 window.addEventListener('keydown', e => { if (e.key === 'Escape') window.close(); });
+// R167: 窗口入场 —— ready-to-show 后补 .in 触发 stats.css 的 #panel 展开过渡
+requestAnimationFrame(() => document.body.classList.add('in'));

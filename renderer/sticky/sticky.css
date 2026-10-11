@@ -40,6 +40,9 @@ body.memo #content { cursor: text; }
   outline: none;
 }
 #content img { max-width: 100%; border-radius: 8px; display: block; margin: 0 auto; }
+/* 图片加载失败占位 */
+#content .img-err { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 18px 6px; text-align: center; font-size: 12px; color: rgba(50, 42, 22, 0.6); }
+#content .img-err .ico { font-size: 32px; opacity: 0.55; }
 #content .todo { display: block; }
 #content .done { color: rgba(50, 42, 22, 0.45); text-decoration: line-through; }
 #grip {

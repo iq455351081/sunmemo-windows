@@ -20,6 +20,16 @@ html, body {
   flex-direction: column;
   overflow: hidden;
 }
+/* R167: 窗口入场 —— body.in（ready-to-show 后由渲染脚本加）前微缩淡出，展开进场 */
+#panel {
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 140ms ease-out, transform 140ms ease-out;
+}
+body.in #panel { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  #panel { transition: none; }
+}
 
 .search-row {
   display: flex; align-items: center; gap: 8px;
@@ -84,6 +94,7 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hist-x {
+  position: relative;
   flex: none; border: 0; background: transparent;
   font-family: inherit; font-size: 12px; line-height: 1;
   color: inherit; opacity: 0.5;
@@ -92,6 +103,7 @@ html, body {
   cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
+.hist-x::after { content: ''; position: absolute; inset: -5px; } /* 25px hit area, visuals unchanged */
 .hist-x:hover { opacity: 1; background: rgba(0, 0, 0, 0.12); }
 
 #list {

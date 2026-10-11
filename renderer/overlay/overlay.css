@@ -244,6 +244,14 @@ body.sw #heroCard {
   /* rotate/zoom 合成层动画：只动 transform，不触发布局重排 */
   transition: transform 260ms var(--ease-spring, cubic-bezier(0.26, 1.32, 0.48, 1));
 }
+.photo-area img {
+  cursor: grab;
+}
+.photo-area img:active { cursor: grabbing; }
+/* 图片加载失败占位（overlay hero） */
+.img-err { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; padding: 20px; text-align: center; }
+.img-err .ico { font-size: 44px; opacity: 0.55; }
+.img-err .txt { font-size: 13px; color: rgba(60, 55, 45, 0.75); }
 
 .hidden { display: none; }
 

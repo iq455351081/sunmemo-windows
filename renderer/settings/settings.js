@@ -218,3 +218,6 @@ checkBtn.addEventListener('click', async () => {
   updStatus.textContent = r.status;
   updStatus.classList.toggle('orange', !!r.update);
 });
+
+// R167: 窗口入场 —— ready-to-show 后补 .in 触发 settings.css 的 .wrap 展开过渡
+requestAnimationFrame(() => document.body.classList.add('in'));
