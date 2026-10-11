@@ -96,7 +96,11 @@ function heroHTML(item) {
     </div>`;
 }
 
-function fileName(url) { return decodeURIComponent(url.split('/').pop() || ''); }
+function fileName(url) {
+  // 文件名含孤立 % 时 decodeURIComponent 抛 URIError —— 失败回退原始串
+  const raw = url.split('/').pop() || '';
+  try { return decodeURIComponent(raw); } catch { return raw; }
+}
 
 function ratioPills(item) {
   const cur = (item.memo && item.memo.aspectRatio) || 'wide';
@@ -141,7 +145,9 @@ function showPreview(payload) {
 function renderHero(item) {
   pv.item = item;
   const size = previewSize(item);
-  photoZoom = 1;
+  // 重置真正的缩放状态（photoZoom 是死变量）：放大后切下一张，滚轮第一下
+  // 不再从旧倍率猛跳。zoomTarget/zoomCurrent 声明在下方，运行时已求值。
+  zoomTarget = zoomCurrent = 1;
   photoRotation = 0;
   heroCard.style.width = size.w + 'px';
   heroCard.style.height = size.h + 'px';
@@ -239,9 +245,12 @@ function initialScale() {
 
 function dismissPreview(instant = false) {
   if (!pv) return;
-  pv = null;
   // R165: Esc 立即消失；点击空白快速收起（原 430ms 弹簧+380ms 延迟被感知为迟钝）
+  // Bug fix: 收起弹簧动画需要 pv 的 peg/origin —— pv=null 延后到 hide() 里，
+  // 否则 animatePreview 开头解构 null 抛 TypeError，收起动画从未播放。
   const hide = () => {
+    if (!pv) return; // 幂等：210ms 内 Esc 等二次 dismiss 不会重复发 overlay:close
+    pv = null;
     heroWrap.classList.add('hidden');
     pegEl.classList.add('hidden');
     cordSvg.style.opacity = 0;
@@ -316,10 +325,12 @@ heroCard.addEventListener('click', ev => {
 function flashBtn(btn, text) {
   if (!btn || !btn.isConnected) return;
   const span = btn.querySelector('span');
-  const old = span ? span.textContent : '';
+  // span 缺失（纯文本按钮）时退化为直接改 btn.textContent，并在超时后还原原文本
+  const old = span ? span.textContent : btn.textContent;
   btn.classList.add('ok');
   if (span) span.textContent = text;
-  setTimeout(() => { if (btn.isConnected) { btn.classList.remove('ok'); if (span) span.textContent = old; } }, 1600);
+  else btn.textContent = text;
+  setTimeout(() => { if (btn.isConnected) { btn.classList.remove('ok'); if (span) span.textContent = old; else btn.textContent = old; } }, 1600);
 }
 
 function startInlineEdit() {
@@ -358,7 +369,6 @@ function startInlineEdit() {
   });
 }
 
-let photoZoom = 1;
 let photoRotation = 0; // CSS transform rotation (deg); visual only, does not touch layout box
 function applyPhotoTransform(img) {
   // compose with zoom so rotate and wheel-zoom never clobber each other's transform

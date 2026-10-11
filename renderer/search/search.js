@@ -51,7 +51,13 @@ function esc(s) {
 }
 
 // R152: 图片结果按文件名匹配/展示（serializeItem 无 createdAt，meta 用尺寸代替）
-const imgName = it => decodeURIComponent(String(it.fileUrl || '').split('/').pop() || '') || '图片';
+// 文件名含孤立 % 时 decodeURIComponent 抛 URIError —— 失败回退原始串
+const imgName = it => {
+  const raw = String(it.fileUrl || '').split('/').pop() || '';
+  let name;
+  try { name = decodeURIComponent(raw); } catch { name = raw; }
+  return name || '图片';
+};
 
 function itemHtml(it, i) {
   if (it.kind === 'image') {

@@ -244,6 +244,7 @@ editor.addEventListener('click', scheduleStat);
 // ---- commit / cancel -------------------------------------------------------------
 
 function commit() {
+  clearTimeout(draftTimer); // Bug fix: 取消挂起的 600ms 草稿保存，防止已提交全文被写回草稿、下次新建误弹"已恢复草稿"
   const trimmed = editor.value.trim();
   if (!trimmed) return;
   api.send('memo:save', { text: trimmed, color, aspectRatio: ratio });

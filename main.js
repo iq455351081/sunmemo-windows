@@ -1514,7 +1514,9 @@ async function exportMemoPng(id) {
     if (stickies.has(item.id) && !stickies.get(item.id).isDestroyed()) return;
     const wide = item.kind === 'image' ? Math.min(420, (item.thumbW || 360) + 48) : 360;
     const high = item.kind === 'image' ? Math.min(460, (item.thumbH || 300) * (wide / (item.thumbW || 360)) + 56) : 280;
-    const pd = lastLineDisplay || screen.getPrimaryDisplay();
+    // 落点在哪个屏就按哪个屏的 workArea 钳制 —— 用 lastLineDisplay 会把
+    // 副屏拖放的便签硬拽回主屏（跨屏钳制错误）。
+    const pd = screen.getDisplayNearestPoint({ x: Math.round(item.desktop.x), y: Math.round(item.desktop.y) }) || screen.getPrimaryDisplay();
     const wa = pd.workArea;
     const x = Math.max(wa.x + 8, Math.min(item.desktop.x - wide / 2, wa.x + wa.width - wide - 8));
     const y = Math.max(wa.y + 8, Math.min(item.desktop.y - 24, wa.y + wa.height - high - 8));
@@ -1665,7 +1667,6 @@ async function exportMemoPng(id) {
 
   // Quick memo window
   ipcMain.on('memo:save', (_e, { text, color, aspectRatio }) => {
-    console.log('[memo:save] arrived, editingId=', memoWin && memoWin._editingId, 'textLen=', text && text.length);
     const editingId = memoWin && memoWin._editingId;
     const from = memoWin ? memoWin.getBounds() : null;
     closeQuickMemo();

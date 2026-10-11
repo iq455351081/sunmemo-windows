@@ -452,7 +452,7 @@ class LineStore {
     // 句柄未释放时 trashItem/rmSync 都会失败
     this.play('trash', 0.5);
     this.drop(id, { quietly: true });
-    setTimeout(() => { shell_trash(item.url); }, 700);
+    shell_trash(item.url); // 立即入回收站：700ms 延迟期间退出应用会留孤儿文件
   }
 
   open(id) {

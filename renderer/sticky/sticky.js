@@ -2,8 +2,12 @@
 /* R99: desktop sticky note — torn off the rope by dragging. Lives until the
    user closes it (which returns the card to the line). Session-only. */
 const api = window.sun;
-const id = (new URLSearchParams(location.search)).get('id')
-  || (process.argv && process.argv.find(a => a.startsWith('--sticky-id=')) || '').replace('--sticky-id=', '');
+const id = (new URLSearchParams(location.search)).get('id') || '';
+// R: 渲染页沙箱无 process，id 只能来自 URL；缺失时友好占位并停止脚本（不引用 process）。
+if (!id) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:sans-serif">参数缺失，请从晾衣绳重新撕下</div>';
+  throw new Error('sticky: no id in URL');
+}
 const content = document.getElementById('content');
 const title = document.getElementById('title');
 
@@ -74,7 +78,11 @@ api.invoke('sticky:data', id).then(item => {
     renderMemo(memoRaw);
   } else {
     document.body.classList.add('photo');
-    title.textContent = decodeURIComponent((item.fileUrl || '').split('/').pop() || '').slice(0, 20);
+    // 文件名含孤立 % 时 decodeURIComponent 抛 URIError —— 失败回退原始串
+    const rawName = (item.fileUrl || '').split('/').pop() || '';
+    let name;
+    try { name = decodeURIComponent(rawName); } catch { name = rawName; }
+    title.textContent = name.slice(0, 20);
     content.innerHTML = `<img src="${item.fileUrl}" alt="">`;
     // 图片丢失（文件被移动/删除）时不留破图：文案占位（sticky 页无 reveal 通道，不提供按钮）。
     const img = content.querySelector('img');

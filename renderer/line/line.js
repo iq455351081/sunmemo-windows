@@ -18,6 +18,10 @@ const pendingTilts = new Map();
 let hoveredId = null;
 let width = 0;
 let dragState = null;
+// Bug fix: mouseup 里 clearPress() 会清空 dragState，浏览器随后补发的 click 到达
+// 时 dragState.moved 守卫恒 false —— Alt 拖拽排序松手必弹预览。记录最近一次
+// "已移动拖拽"释放的时间戳，click 处理器据此在 300ms 内拦截。
+let lastDragMoved = 0;
 window.__lastState = null;
 
 const ICONS = {
@@ -568,7 +572,7 @@ function mousemoveWork(ev) {
         document.body.classList.add('reordering');
       }
       else startDrag(dragState.id); // plain drag = native file drag (drop into chat apps etc.)
-      if (!dragState.reordering) clearPress();
+      if (!dragState.reordering && !dragState.tearing) clearPress();
     }
     if (dragState && dragState.reordering && !dragState.reorderDone) {
       const steps = Math.round((ev.screenX - dragState.x0) / 205);
@@ -608,6 +612,7 @@ document.addEventListener('mouseout', ev => {
   if (!ev.relatedTarget) { const s = hoveredId && slots.get(hoveredId); if (s) setHoveredSlot(null); }
 });
 window.addEventListener('mouseup', ev => {
+  lastDragMoved = dragState && dragState.moved ? Date.now() : 0;
   if (dragState && dragState.tearing && dragState.moved) {
     const id = dragState.id;
     const below = ev.clientY > innerHeight - 44 || ev.screenY > (window.screenY + innerHeight - 20);
@@ -655,6 +660,7 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 cardsEl.addEventListener('click', ev => {
+  if (Date.now() - lastDragMoved < 300) return; // 拖拽松手后浏览器补发的 click 不算点击
   const slotEl = ev.target.closest('.slot');
   if (!slotEl || !slotEl.dataset.id) return;
   const id = slotEl.dataset.id;
