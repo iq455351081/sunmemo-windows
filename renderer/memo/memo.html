@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../common.css">
+<link rel="stylesheet" href="memo.css">
+</head>
+<body>
+  <div id="sheet">
+    <div id="dragbar"></div>
+    <div class="head">
+      <div class="title">
+        <span class="ic" id="titleIcon"></span>
+        <span id="titleText">写下想法 / 待办备忘</span>
+      </div>
+      <div class="head-right">
+        <div class="color-dots" id="colorDots"></div>
+        <button class="close-x" id="closeBtn" title="取消 (Esc)" aria-label="关闭"></button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="tb" data-tool="todo" aria-label="插入待办"><span class="ic"></span>待办</button>
+      <button class="tb" data-tool="bold" aria-label="粗体">B 粗体</button>
+      <button class="tb" data-tool="list" aria-label="插入列表"><span class="bullet">•</span>列表</button>
+      <button class="tb" data-tool="heading" aria-label="插入标题">H 标题</button>
+      <button class="tb" data-tool="tpl" id="tplBtn" aria-label="插入模板">模板 ▾</button>
+      <span class="tb-spacer"></span>
+      <div class="ratio-pills" id="ratioPills"></div>
+      <div class="seg" id="modeSeg">
+        <button class="seg-btn active" data-mode="edit">编辑</button>
+        <button class="seg-btn" data-mode="preview">MD 预览</button>
+      </div>
+    </div>
+    <div class="editor-wrap">
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div id="placeholder">写下想法、未完成的事项或临时待办...
+
+• 支持 Markdown 语法与清单 (- [ ] 待办)
+• 按 回车 自动续接待办列表
+• 按 Ctrl + 回车 即可挂上晾衣绳</div>
+      <div id="preview" class="md-preview"></div>
+    </div>
+    <div class="foot">
+      <div class="foot-left">
+        <span class="kbd-hint">Ctrl+Enter 挂上 · Esc 取消</span>
+      <span id="statCount"></span>
+        <button id="openMd">📄 本地 MD 备份</button>
+      </div>
+      <span class="foot-spacer"></span>
+      <button id="cancelBtn">取消</button>
+      <button id="commitBtn"><span class="pin-ic" id="pinIcon"></span><span id="commitText">挂上晾衣绳</span></button>
+    </div>
+  </div>
+  <script src="../../src/layout.js"></script>
+  <script src="../common.js"></script>
+  <script src="memo.js"></script>
+</body>
+</html>

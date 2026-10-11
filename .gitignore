@@ -1,0 +1,11 @@
+node_modules/
+_shots/archive/
+_shots/desktop-top.png
+_shots/r85-dark-line.png
+_shots/user-strip-check.png
+_shots/strip-zoom1.png
+_shots/strip-zoom2.png
+_shots/mem-baseline.json
+*.log
+config.json.bak
+.spec-workflow/

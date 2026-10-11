@@ -1,0 +1,652 @@
+/* SunMemo clothesline — faithful port of LineView.swift / PeggedView.swift. */
+
+:root {
+  --label: rgba(28, 26, 22, 0.94);
+  --secondary: rgba(60, 60, 67, 0.62);
+  --green: #34c759;
+  --accent: #ff8f1f;
+  --panel-h: 275px;
+  --rope-top: 10px;
+  --card-radius: 16px;
+  --card-inset: 4px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+html, body {
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+  height: var(--panel-h);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  color: var(--label);
+  cursor: default;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  transform: translateY(calc(-1 * (var(--panel-h) + 12px)));
+  transition: transform 220ms cubic-bezier(0.55, 0, 1, 0.45); /* easeIn tuck-up */
+}
+#stage.revealed {
+  transform: translateY(0);
+  transition: transform var(--dur-view) cubic-bezier(0.30, 1.24, 0.64, 1); /* feather-light drop */
+}
+
+/* ---- The rope (Rope.swift): parabola with 3 strokes, faded at both ends -- */
+#rope {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 44px;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+}
+
+/* ---- Glass material (glassFrame) ------------------------------------------ */
+/* Software rendering: no CPU blur, no compositor layers, snappier curves.
+   (Inserted before .glass so the overrides below still win by specificity.) */
+body.sw .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(250, 250, 250, 0.88);
+}
+body.sw .slot { will-change: auto; transition-duration: 200ms; }
+body.sw .cardfx { will-change: auto; }
+
+.glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.20);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+}
+.glass::before { /* outer hairline, black 0.10 */
+  content: '';
+  position: absolute; inset: -0.5px;
+  border-radius: inherit;
+  border: 0.5px solid rgba(0, 0, 0, 0.10);
+  pointer-events: none;
+}
+.glass::after { /* gradient stroke, white .55 → .12 */
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 0.75px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---- Card slots ------------------------------------------------------------ */
+.slot {
+  position: absolute;
+  top: 0;
+  transform-origin: 50% 0;
+  /* SwiftUI spring(0.28, 0.78) has a slight overshoot — bounce curve here. */
+  transition: transform var(--dur-card) var(--ease-spring);
+  will-change: transform;
+}
+.slot .arrive {
+  transform: translateY(-46px);
+  opacity: 0;
+  transition: transform var(--dur-view) cubic-bezier(0.22, 1.24, 0.42, 1), opacity 160ms ease-out;
+}
+.slot.arrived .arrive { transform: translateY(0); opacity: 1; }
+.slot.falling { opacity: 0 !important; transition: opacity 160ms ease-out; }
+/* R160: when the WAAPI crumple-then-drop runs on .cardfx (line.js), keep the
+   slot itself opaque — same specificity as .slot.falling, later rule wins. */
+.slot.fall-anim { opacity: 1 !important; transition: none; }
+.slot.flying .arrive { opacity: 0; transition: opacity 160ms ease-out; }
+
+.swing { transform-origin: 50% 2px; }
+
+/* ---- Aluminium clothespin (Clothespin.swift) ------------------------------- */
+.peg {
+  position: relative;
+  width: 9px; height: 26px;
+  margin: 0 auto -12px auto; /* VStack spacing -12 */
+  border-radius: 3.5px;
+  background: linear-gradient(to right, #b3b3b3, #ededed 35%, #d1d1d1 65%, #9e9e9e);
+  box-shadow:
+    0 1.5px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 0.6px rgba(255, 255, 255, 0.55),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.10);
+  z-index: 2;
+  pointer-events: none;
+}
+.peg::after { /* grip slot */
+  content: '';
+  position: absolute;
+  top: 8.5px; left: 50%;
+  width: 5px; height: 1.4px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+/* ---- Cards ------------------------------------------------------------------ */
+.cardfx {
+  transform-origin: 50% 0;
+  transition: transform 450ms ease-in-out, box-shadow 180ms ease-out, opacity 180ms ease-out;
+  /* two-tier shadow: tight contact + wide ambient (R10) */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.14),
+    0 6px 14px rgba(0, 0, 0, 0.16);
+  border-radius: var(--card-radius);
+}
+.slot.hover .cardfx {
+  /* R147: 悬停保持双层 — 近触接触阴影 + 更大更柔的环境光晕 */
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.16),
+    0 10px 24px rgba(0, 0, 0, 0.20);
+}
+.memo-face::before {
+  /* lit-paper top sheen */
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.slot.hover .memo-face,
+.slot.hover .photo-clip {
+  filter: brightness(1.02) saturate(1.04);
+}
+.slot.pressed .cardfx { transform: scale(0.96); }
+.slot.dragging .cardfx { opacity: 0.45; }
+.slot.reordering { z-index: 2000 !important; }
+.slot.reordering .cardfx {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  transform: scale(1.04);
+  cursor: grabbing;
+}
+body.reordering * { cursor: grabbing !important; }
+/* R147: 拖出文件（普通拖拽）时 lineWin 的抓取光标 — 按下即给 grabbing 反馈 */
+.slot:active { cursor: grabbing; }
+@keyframes card-flash-anim {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+.card-flash-ring { position: absolute; inset: -6px; border-radius: 20px; border: 3px solid var(--accent, #ff8f1f); box-shadow: 0 0 18px rgba(255, 143, 31, 0.7); pointer-events: none; animation: card-flash-anim 1.6s ease-out forwards; }
+
+#reorderIndicator {
+  position: fixed;
+  width: 0; height: 110px;
+  border-left: 3px solid var(--accent, #ff8f1f);
+  border-radius: 2px;
+  z-index: 300000;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(255, 143, 31, 0.6);
+}
+
+.card {
+  position: relative;
+  border-radius: var(--card-radius);
+  overflow: visible;
+}
+.card .hit { position: absolute; inset: 0; border-radius: var(--card-radius); }
+
+/* Screenshot / photo card */
+.card.photo {
+  padding: var(--card-inset);
+  background: #ffffff; /* R104: 相框底色 — R98 去漆后相框透出壁纸 */
+}
+.card.photo .photo-clip {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+  line-height: 0;
+}
+.card.photo img { display: block; border-radius: 12px; }
+
+/* Memo (sticky note) card */
+.card.memo { padding: var(--card-inset); }
+.memo-face {
+  position: relative;
+  border-radius: 12px;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.memo-body { flex: 1; display: flex; flex-direction: column; gap: 3.5px; min-height: 0; overflow: hidden; }
+.memo-body > * { flex: none; }
+.img-badge {
+  position: absolute;
+  right: 4px; bottom: 4px;
+  font-size: 8.5px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  padding: 1px 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.slot.hover .img-badge { opacity: 1; }
+
+/* ---- Copied badge (restored — the base styles were lost in a patch) ------ */
+.copied-badge {
+  position: absolute;
+  left: 50%; bottom: -10px;
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: var(--label);
+  padding: 5px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  z-index: 6;
+  pointer-events: none;
+}
+.copied-badge svg { width: 10px; height: 10px; color: var(--green); }
+.copied-badge.show {
+  opacity: 1;
+  animation: badge-pop var(--dur-card) cubic-bezier(0.26, 1.5, 0.48, 1);
+}
+@keyframes badge-pop {
+  0% { transform: translateX(-50%) translateY(6px) scale(0.86); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.pin-divider {
+  position: absolute;
+  width: 0; height: 120px;
+  border-left: 1.5px dashed rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transition: opacity 260ms ease;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  .pin-divider { border-left-color: rgba(255, 255, 255, 0.22); }
+}
+
+.pin-badge {
+  position: absolute;
+  top: 4px; right: 6px;
+  font-size: 10px;
+  line-height: 1;
+  z-index: 2;
+  filter: saturate(1.2);
+  pointer-events: none;
+}
+.tag-row { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; margin-top: 2px; }
+.tag-chip {
+  flex: none;
+  font-size: 9px; font-weight: 600;
+  color: rgba(90, 70, 20, 0.75);
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 99px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.memo-foot {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 4px; min-height: 15px;
+  flex: none;
+}
+.done-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border: 0; background: none; padding: 0;
+  color: var(--secondary); cursor: pointer;
+}
+.done-btn.done { color: var(--green); }
+.done-btn svg { width: 14px; height: 14px; }
+.todo-stats {
+  font-size: 9.5px; font-weight: 600;
+  color: var(--secondary);
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 99px;
+  padding: 1.5px 5px;
+  white-space: nowrap;
+}
+.todo-stats.all { color: var(--green); }
+.memo-time { margin-left: auto; font-size: 9.5px; color: rgba(60, 60, 67, 0.50); white-space: nowrap; }
+
+/* ---- Markdown on cards ------------------------------------------------------ */
+.md-todo { display: flex; align-items: flex-start; gap: 5px; cursor: pointer; }
+.md-box {
+  flex: none;
+  width: 11px; height: 11px;
+  margin-top: 2.5px;
+  border-radius: 2.5px;
+  border: 1.2px solid rgba(60, 60, 67, 0.55);
+  background: rgba(255, 255, 255, 0.35);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  transition: background 120ms ease;
+}
+.md-todo:hover .md-box { border-color: rgba(60, 60, 67, 0.85); }
+.md-box.checked { background: var(--green); border-color: var(--green); }
+.md-todo-text { font-size: 11.5px; font-weight: 500; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-todo.is-done .md-todo-text { color: var(--secondary); text-decoration: line-through; }
+.md-h { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-p { font-size: 11.5px; font-weight: 500; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-p.is-done { color: var(--secondary); text-decoration: line-through; }
+.md-li { display: flex; gap: 4px; font-size: 11.5px; font-weight: 500; line-height: 1.5; }
+.md-li .md-dot { color: var(--secondary); }
+.md-li span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-quote { font-size: 11px; color: var(--secondary); border-left: 2px solid rgba(0, 0, 0, 0.12); padding-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-more { font-size: 9.5px; color: rgba(60, 60, 67, 0.45); }
+.md-blank { height: 4px; }
+
+/* ---- Discard cross (hover) ---------------------------------------------------- */
+.discard-x {
+  position: absolute;
+  top: 4px; left: 4px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--label);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+  z-index: 5;
+}
+.discard-x svg { width: 8px; height: 8px; }
+.slot.hover .discard-x { opacity: 1; transform: scale(1); }
+
+/* ---- Copied badge ---------------------------------------------------------------- */
+.hover-tools {
+  position: absolute;
+  top: 4px; right: 4px;
+  display: flex; gap: 2px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 4;
+  pointer-events: none;
+}
+.slot.hover .hover-tools { opacity: 1; transform: none; pointer-events: auto; }
+.hover-tools .tool {
+  width: 20px; height: 20px;
+  border: 0; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.10);
+  font-size: 10px; line-height: 1;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 120ms ease;
+}
+.hover-tools .tool:hover { background: rgba(0, 0, 0, 0.20); }
+.hover-tools .tool.on { background: rgba(52, 199, 89, 0.25); }
+.hover-tools .tool.danger:hover { background: rgba(255, 69, 58, 0.30); }
+
+/* R104: removed a mis-planted second .pin-badge block (copied-badge styles:
+   left:50% / bottom:-10px / opacity:0) that made the pinned corner badge
+   permanently invisible, plus the duplicate .pin-divider block and the
+   duplicated .copied-badge svg / .copied-badge.show / @keyframes badge-pop.
+   The correct .pin-badge is defined above (top:4px right:6px); .copied-badge
+   and badge-pop are defined once near the top of the file. */
+
+/* ---- Add-memo card --------------------------------------------------------------- */
+.add-card {
+  padding: var(--card-inset);
+  cursor: pointer;
+}
+.add-face {
+  width: 206px; height: 126px;
+  border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.2px dashed rgba(255, 255, 255, 0.35);
+  transition: background 180ms ease, border-color 180ms ease, transform 280ms cubic-bezier(0.32, 0.9, 0.42, 1);
+}
+/* R104: R98 去漆后加号卡失去底色 — 恢复实底（.add-card 提高特异性，盖过 .add-face 的透明底） */
+.add-card .add-face { background: rgba(255, 255, 255, 0.55); }
+.slot.hover .add-face,
+.add-card:hover .add-face {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  transform: scale(1.03);
+}
+.add-face .plus { font-size: 26px; color: var(--secondary); line-height: 1; transition: color 180ms ease; }
+.slot.hover .plus, .add-card:hover .plus { color: #ff8f1f; }
+.add-face .t1 { font-size: 13px; font-weight: 600; }
+.add-face .t2 { font-size: 10.5px; color: var(--secondary); line-height: 1.5; }
+.add-card .cardfx { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12); }
+.slot.hover .add-card .cardfx { box-shadow: 0 6px 12px rgba(0, 0, 0, 0.22); }
+
+/* ---- Empty-state welcome card（绳上无便签时的引导纸片）---- */
+.wc-fx { border-radius: 12px; }
+.welcome-card {
+  position: relative;
+  width: 180px;
+  border-radius: 12px;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  padding: 11px 12px 9px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: linear-gradient(160deg, #fff7c2, #f7e58e 70%, #f0dc74); /* 黄纸感，同便签 yellow */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  animation: wc-in 340ms var(--ease-spring);
+}
+.welcome-card::before { /* 顶部受光纸面高光，与 .memo-face::before 同族 */
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.wc-title { font-size: 12.5px; font-weight: 700; color: rgba(96, 70, 14, 0.95); }
+.wc-sub { font-size: 10px; line-height: 1.55; color: rgba(96, 76, 22, 0.68); }
+.wc-entry {
+  display: flex; align-items: center; gap: 6px;
+  border: 0; background: none; padding: 3px 2px;
+  font-family: inherit; font-size: 11.5px; font-weight: 600;
+  color: rgba(84, 60, 10, 0.9);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 140ms ease;
+}
+.wc-entry span { font-size: 12px; line-height: 1; }
+.wc-entry:hover { text-decoration: underline; color: #a8690a; }
+@keyframes wc-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .welcome-card { animation: none; } }
+@media (prefers-color-scheme: dark) {
+  /* 深色：纸片压暗一档但保持黄纸 + 深字（同 R104 便签不翻黑的原则） */
+  .welcome-card {
+    background: linear-gradient(160deg, #e3d28c, #d3bf6a 70%, #c8b35c);
+    border-color: rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 14px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* ---- Top-right buttons -------------------------------------------------------------- */
+#topButtons {
+  position: absolute;
+  top: 20px;
+  right: 10px;
+  display: flex; align-items: center; gap: 8px;
+  z-index: 9999;
+}
+.capsule-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 0; cursor: pointer;
+  color: var(--label);
+  font-family: inherit;
+  font-size: 11px; font-weight: 500;
+  padding: 5px 9px;
+  border-radius: 99px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14);
+  transition: background 150ms ease;
+}
+.capsule-btn:hover { background: rgba(255, 255, 255, 0.34); }
+.capsule-btn .ic, .hint .ic { display: inline-flex; }
+.capsule-btn .ic svg, .hint .ic svg { width: 11px; height: 11px; }
+.capsule-btn.ok { color: #1f9d48; }
+.gear-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 0; cursor: pointer;
+  color: var(--secondary);
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  transition: background 150ms ease;
+}
+.gear-btn:hover { background: rgba(255, 255, 255, 0.34); }
+.gear-btn .ic svg { width: 13px; height: 13px; }
+
+/* ---- Keyboard cheatsheet popover ---- */
+#keysPop {
+  position: absolute;
+  top: 56px; right: 10px;
+  z-index: 100000;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(250, 250, 252, 0.96);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+  animation: keys-in 200ms cubic-bezier(0.26, 1.3, 0.48, 1);
+}
+@keyframes keys-in { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes toast-in { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+#keysPop .krow { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; font-size: 11.5px; }
+#keysPop .krow b { font-family: Consolas, monospace; font-size: 10.5px; min-width: 128px; color: rgba(28,26,22,0.9); }
+/* R148: ⌨ 命令面板 — keysPop 容器加顶部搜索框与可点命令行（深浅色沿用 keysPop） */
+#keysPop.cmd { padding: 8px 10px; width: 268px; }
+#keysPop .cmd-input {
+  width: 100%;
+  border: 0; outline: none;
+  font-family: inherit; font-size: 12px;
+  color: var(--label);
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 6px 9px;
+  margin-bottom: 6px;
+}
+#keysPop .cmd-input::placeholder { color: var(--secondary); }
+#keysPop .krow.cmd-row b { min-width: 20px; text-align: center; font-size: 12px; }
+#keysPop .krow.click { cursor: pointer; border-radius: 6px; padding: 3px 6px; margin: 0 -6px; }
+#keysPop .krow.click:hover { background: rgba(255, 143, 31, 0.16); }
+#keysPop .krow.empty { justify-content: center; color: var(--secondary); }
+
+/* ---- Empty hint ------------------------------------------------------------------------ */
+.hint {
+  position: absolute;
+  left: 50%; top: 190px;
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 500;
+  color: var(--secondary);
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: rgba(245, 245, 247, 0.85);
+  white-space: nowrap;
+  transition: opacity 300ms ease;
+}
+.hint .ic svg { width: 12px; height: 12px; }
+.hint.hidden { opacity: 0; pointer-events: none; }
+
+/* R33 节电模式：停掉一切环境动画与合成器提示 */
+body.power-save .slot { will-change: auto; transition-duration: 120ms; }
+body.power-save .cardfx { transition: none; }
+
+/* R41 紧凑模式：只显示首行标题与页脚 */
+body.compact .slot.peek-full .memo-face { height: var(--full-h, 122px) !important; }
+body.compact .slot.peek-full .md-todo, body.compact .slot.peek-full .md-li,
+body.compact .slot.peek-full .md-quote, body.compact .slot.peek-full .md-more { display: flex !important; }
+body.compact .slot.peek-full .memo-body > :not(.md-h):not(:first-child) { display: flex !important; }
+body.compact .memo-face { height: 64px !important; }
+body.compact .memo-face::before { height: 100%; }
+body.compact .md-todo, body.compact .md-li, body.compact .md-quote,
+body.compact .md-more, body.compact .tag-row { display: none !important; }
+body.compact .memo-body { overflow: hidden; justify-content: center; }
+body.compact .memo-body > :not(.md-h):not(:first-child) { display: none; }
+
+/* R38 字号 */
+body[data-font="sm"] .md-p, body[data-font="sm"] .md-todo-text, body[data-font="sm"] .md-li { font-size: 10.5px; }
+body[data-font="lg"] .md-p, body[data-font="lg"] .md-todo-text, body[data-font="lg"] .md-li { font-size: 13px; }
+body[data-font="lg"] .md-h { font-size: 13.5px; }
+
+/* dark-mode */
+
+
+/* ---- dark mode (follows system) — cards stay pastel sticky-notes ---- */
+@media (prefers-color-scheme: dark) {
+  :root { --label: rgba(240, 240, 245, 0.95); --secondary: rgba(200, 200, 210, 0.66); }
+  .glass { background: rgba(42, 42, 48, 0.62); }
+  .glass::after { background: linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0.05)); }
+  .capsule-btn, .gear-btn { color: rgba(235, 235, 240, 0.9); }
+  .capsule-btn:hover, .gear-btn:hover { background: rgba(255, 255, 255, 0.12); }
+  .hint { background: rgba(40, 40, 46, 0.85); color: rgba(220, 220, 230, 0.8); }
+  .add-face { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.25); }
+  .slot.hover .add-face { background: rgba(255, 255, 255, 0.14); }
+  .add-face .t2, .hint .ic, .gear-btn { color: rgba(210, 210, 220, 0.75); }
+  .done-btn { color: rgba(220, 220, 230, 0.7); }
+  #keysPop { background: rgba(36, 36, 42, 0.97); }
+  #keysPop .krow b { color: rgba(235, 235, 240, 0.92); }
+  #keysPop .cmd-input { background: rgba(255, 255, 255, 0.09); }
+}
+
+/* R94: file-drop glow — the rope lights up while files hover over the line */
+#stage.file-hover #rope { filter: drop-shadow(0 0 7px rgba(255, 143, 31, 0.85)); }
+#stage.file-hover .slot .cardfx { box-shadow: 0 0 0 2px rgba(255, 143, 31, 0.35); }
+
+/* R98: the glass paint on cardfx collapsed into a 12-24px strip at each
+   card's top (the layer only wraps the peg area) — on busy wallpapers it
+   read as a mystery white "border bar" behind every card. cardfx is a
+   shadow/transform carrier; the face provides all the paint. */
+.cardfx { background: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.cardfx::before, .cardfx::after { content: none !important; }
+
+/* R98: 📌 pinned state — visible on/off feedback for the stay-open toggle */
+.gear-btn.pinned { background: rgba(255, 143, 31, 0.9); border-color: rgba(255, 143, 31, 0.95); box-shadow: 0 0 8px rgba(255, 143, 31, 0.55); }
+.gear-btn.pinned .ic { filter: grayscale(1) brightness(2.2); }
+
+/* R98 root cause: renderCardContent puts `.hit` on the visible paper itself
+   (`.memo-face.hit`) for click-gating, but `.hit` is `position:absolute;
+   inset:0` — the paper left the flow, every ancestor collapsed to a ~24px
+   peg-height box, and cardfx's shadow + glass painted as the mystery strip
+   above each card. The face is the visible paper: keep it in flow. */
+.memo-face.hit { position: relative; inset: auto; }
+
+/* R98b: same collapse on photo cards — `.photo-clip.hit` went absolute and
+   the photo card's box collapsed to peg height (strip + stray shadow band). */
+.card.photo .photo-clip.hit { position: relative; inset: auto; }
+
+/* R104: 深色模式补丁 — sw 渲染下玻璃面板翻黑；卡片正文固定深字（卡片保持
+   pastel 便签底，不随系统深色翻白）；顶部按钮/提示字色；加号卡与相框底色 */
+@media (prefers-color-scheme: dark) {
+  body.sw .glass { background: rgba(42, 42, 48, 0.96); }
+  .slot .memo-face, .slot .memo-face * { color: rgba(40, 34, 24, 0.92); }
+  .slot .memo-face .md-box { color: #2f9e44; }
+  .slot .memo-face .done-btn { color: rgba(40, 34, 24, 0.7); }
+  .gear-btn, .hint, #keysPop { color: rgba(235, 235, 240, 0.9); }
+  .add-card .add-face { background: rgba(42, 42, 48, 0.6); }
+  .card.photo { background: #2a2a30; }
+}
+
+/* ---- 统一滚动条（R166b：全组件细圆角悬浮拇指，浅/深色） ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.35);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 140, 150, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
+}

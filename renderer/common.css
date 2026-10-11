@@ -1,0 +1,144 @@
+/* Shared styles for all renderer pages: markdown rendering, glass material,
+   clothespins. Loaded before each page's own CSS. */
+
+/* ---- 动效账本 (motion ledger) — 全应用时长/缓动唯一出处 --------------------
+   --dur-fast  140ms  即时反馈（hover / 按压 / 勾选；上限 150ms，不得再慢）
+   --dur-card  340ms  卡片级微动（slot 归位、badge 弹出）
+   --dur-view  420ms  视图级过渡（面板显隐、hero 进出场、卡片落下）
+   --dur-hero  620ms  hero 主演出（预览 spring 入场；仅此一处）
+   --ease-spring      标准回弹曲线，卡片/视图过渡的默认缓动
+   设计例外保留：swingTo 1250ms（WAAPI 晃动主节奏）、预览 620ms spring、
+   card-flash-anim 1.6s（一次性淡出动画，非过渡）。
+   调整节奏只改本块，页面 CSS 一律引用变量。 */
+:root {
+  --dur-fast: 140ms;
+  --dur-card: 340ms;
+  --dur-view: 420ms;
+  --dur-hero: 620ms;
+  --ease-spring: cubic-bezier(0.26, 1.32, 0.48, 1);
+  --label: rgba(28, 26, 22, 0.94);
+  --secondary: rgba(60, 60, 67, 0.62);
+  --green: #34c759;
+  --accent: #ff8f1f;
+  --accent-soft: rgba(255, 143, 31, 0.55);           /* sunrise orange, matches the app icon */
+  --label-inverse: #ffffff;
+  --hairline: rgba(0, 0, 0, 0.10);
+  --shadow-rest: 0 5px 10px rgba(0, 0, 0, 0.18);
+  --shadow-lift: 0 8px 14px rgba(0, 0, 0, 0.26);
+}
+
+/* ---- glass material -------------------------------------------------------- */
+.glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.20);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+.glass::before {
+  content: '';
+  position: absolute; inset: -0.5px;
+  border-radius: inherit;
+  border: 0.5px solid rgba(0, 0, 0, 0.10);
+  pointer-events: none;
+}
+.glass::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 0.75px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---- markdown base ---------------------------------------------------------- */
+.md-todo { display: flex; align-items: flex-start; gap: 5px; cursor: pointer; }
+.md-box {
+  flex: none;
+  width: 11px; height: 11px;
+  margin-top: 2.5px;
+  border-radius: 2.5px;
+  border: 1.2px solid rgba(60, 60, 67, 0.55);
+  background: rgba(255, 255, 255, 0.35);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  transition: background 120ms ease;
+}
+.md-todo:hover .md-box { border-color: rgba(60, 60, 67, 0.85); }
+.md-box.checked { background: var(--green); border-color: var(--green); }
+.md-box svg { width: 9px; height: 9px; }
+.md-todo-text { font-size: 11.5px; font-weight: 500; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-todo.is-done .md-todo-text { color: var(--secondary); text-decoration: line-through; }
+/* Explicit line-heights keep emoji glyph metrics from inflating line boxes
+   (Segoe UI Emoji renders taller than text, which destabilised card layout). */
+.md-h { font-size: 12px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-p { font-size: 11.5px; font-weight: 500; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-more { line-height: 1.4; }
+.md-p.is-done { color: var(--secondary); text-decoration: line-through; }
+.md-li { display: flex; gap: 4px; font-size: 11.5px; font-weight: 500; line-height: 1.5; }
+.md-li .md-dot { color: var(--secondary); }
+.md-li span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-quote { font-size: 11px; color: var(--secondary); border-left: 2px solid rgba(0, 0, 0, 0.12); padding-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-more { font-size: 9.5px; color: rgba(60, 60, 67, 0.45); }
+.md-blank { height: 4px; }
+.md-empty { font-size: 13px; color: rgba(60, 60, 67, 0.5); padding-top: 10px; }
+.md-h b, .md-p b { font-weight: 700; }
+
+/* ---- clothespin (shared by line + overlay fx) -------------------------------- */
+.peg, .pin {
+  position: relative;
+  border-radius: 3.5px;
+  background: linear-gradient(to right, #b3b3b3, #ededed 35%, #d1d1d1 65%, #9e9e9e);
+  box-shadow:
+    0 1.5px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 0.6px rgba(255, 255, 255, 0.55),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.10);
+  pointer-events: none;
+}
+.peg { width: 9px; height: 26px; }
+.peg::after, .pin::after {
+  content: '';
+  position: absolute;
+  top: 8.5px; left: 50%;
+  width: 5px; height: 1.4px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+/* ---- software-rendering fallback (body.sw): no backdrop-filter ----------
+   Without GPU compositing each blur is rasterized on the CPU, which stutters
+   the whole machine. Opaque frosted white reads nearly identically at these
+   sizes and costs almost nothing. */
+body.sw .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(250, 250, 250, 0.88);
+}
+
+/* dark-mode */
+
+
+/* dark-mode */
+@media (prefers-color-scheme: dark) {
+  .glass { background: rgba(42, 42, 48, 0.62); }
+  .tag-chip { color: rgba(30, 26, 12, 0.8); }
+}
+
+/* ---- 统一滚动条（R166b：全组件细圆角悬浮拇指，浅/深色） ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.35);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 140, 150, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
+}

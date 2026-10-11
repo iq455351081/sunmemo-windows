@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <div id="card">
+    <div class="brand">
+      <img id="appIcon" alt="">
+      <div class="bt">欢迎使用 SunMemo</div>
+      <div class="bs">把未完成的想法与待办，晾在桌面阳光下</div>
+      <div class="bs-sub">本地离线 · 数据自主 · 完全免费</div>
+      <div class="accent-line"></div>
+    </div>
+    <div class="features">
+      <div class="f-row"><span class="f-ic sunrise"></span><div><div class="f-t">桌面顶部晾衣绳</div><div class="f-d">快捷键随时呼出收起，卡片多时自然扇面叠放</div></div></div>
+      <div class="f-row"><span class="f-ic mint"></span><div><div class="f-t">便签速记与待办清单</div><div class="f-d">弹窗速记与多色卡片，直接在绳上卡片点击打勾</div></div></div>
+      <div class="f-row"><span class="f-ic sakura"></span><div><div class="f-t">截图与剪贴板接管</div><div class="f-d">一键收纳截图与复制内容，桌面始终干净清爽</div></div></div>
+      <div class="f-row"><span class="f-ic sky"></span><div><div class="f-t">本地 Markdown 实时备份</div><div class="f-d">实时同步至 文档\SunMemo.md，安心防丢失</div></div></div>
+    </div>
+    <label class="takeover">
+      <input type="checkbox" id="chkTakeover" checked>
+      <span><span class="ct">允许 SunMemo 接管系统截图</span><br><span class="cs">截图瞬间自动晾到绳上，不堆积在桌面。随时可从托盘菜单关闭。</span></span>
+    </label>
+    <div class="actions">
+      <button id="laterBtn">以后再说</button>
+      <button id="startBtn">开始使用</button>
+    </div>
+  </div>
+  <script src="welcome.js"></script>
+</body>
+</html>

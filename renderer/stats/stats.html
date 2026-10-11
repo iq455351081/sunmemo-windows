@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="stats.css">
+</head>
+<body>
+  <div id="panel">
+    <div class="head">
+      <span class="t">📊 本周概览</span>
+      <button id="closeBtn" title="关闭" aria-label="关闭">✕</button>
+    </div>
+    <div class="grid">
+      <div class="stat"><div class="n" id="nOnLine">0</div><div class="l">在绳便签</div></div>
+      <div class="stat"><div class="n" id="nTodos">0/0</div><div class="l">待办完成</div></div>
+      <div class="stat"><div class="n" id="nTorn">0</div><div class="l">本周撕下</div></div>
+      <div class="stat"><div class="n" id="nArch">0</div><div class="l">历史归档</div></div>
+    </div>
+    <div class="trend">
+      <div class="bl">近 7 日撕下动态<span class="cmp" id="cmp"></span><span class="win-sw" id="winSw"><button class="ws on" data-off="0">本 7 日</button><button class="ws" data-off="7">上 7 日</button></span><button id="csvBtn" title="导出 CSV">📊</button></div>
+      <div class="trend-bars" id="trendBars"></div>
+    </div>
+    <div class="recycle">
+      <div class="bl">回收站 · 最近撕下</div>
+      <div id="recycleList"></div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bl">待办进度</div>
+      <div class="bar"><div class="fill" id="todoBar"></div></div>
+      <div class="bl2" id="todoPct">0%</div>
+    </div>
+    <div class="tip">数据实时统计自当前晾衣绳与归档。</div>
+  </div>
+  <script src="stats.js"></script>
+</body>
+</html>

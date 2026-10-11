@@ -1,0 +1,95 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: transparent; height: 100%; overflow: hidden;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  user-select: none;
+}
+#paper {
+  height: calc(100% - 10px); margin: 5px;
+  border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #fdf9ec, #faf3dc);
+  border: 0.5px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+#bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px 5px 12px;
+  -webkit-app-region: drag;
+  cursor: default;
+}
+#title { flex: 1; font-size: 11px; font-weight: 700; color: rgba(120, 105, 60, 0.75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bar button {
+  -webkit-app-region: no-drag;
+  font-family: inherit; font-size: 10.5px;
+  border: 0; border-radius: 6px; padding: 3px 8px;
+  cursor: pointer; color: #6d6046;
+  background: rgba(0, 0, 0, 0.07);
+}
+#bar button:hover { background: rgba(0, 0, 0, 0.13); }
+#closeBtn { width: 22px; }
+#content {
+  flex: 1; overflow: auto; padding: 4px 14px 12px;
+  font-size: 13px; line-height: 1.55; color: rgba(50, 42, 22, 0.92);
+  white-space: pre-wrap; word-break: break-word;
+}
+body.memo #content { cursor: text; }
+#content[contenteditable="true"] {
+  box-shadow: inset 0 0 0 1px rgba(120, 105, 60, 0.35);
+  border-radius: 6px;
+  outline: none;
+}
+#content img { max-width: 100%; border-radius: 8px; display: block; margin: 0 auto; }
+#content .todo { display: block; }
+#content .done { color: rgba(50, 42, 22, 0.45); text-decoration: line-through; }
+#grip {
+  position: absolute; right: 4px; bottom: 4px;
+  width: 16px; height: 16px; cursor: nwse-resize;
+  -webkit-app-region: no-drag;
+  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.18) 50%);
+  border-radius: 3px;
+}
+body.photo #paper { background: #f6f6f4; }
+/* R138: torn-off memo keeps its card color (yellow is #paper's default). */
+body.memo.color-green #paper { background: linear-gradient(180deg, #f0f7ec, #e8f3e2); }
+body.memo.color-pink #paper { background: linear-gradient(180deg, #fdf0f4, #fbe9ef); }
+body.memo.color-blue #paper { background: linear-gradient(180deg, #eef4fd, #e4eefa); }
+body.memo.color-grape #paper { background: linear-gradient(180deg, #f4f0fd, #ece6fb); }
+/* R151: 桌面便签右键小菜单 */
+.sticky-menu {
+  position: fixed; z-index: 99;
+  min-width: 96px; padding: 4px;
+  background: #ffffff;
+  border: 0.5px solid rgba(0, 0, 0, 0.10);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  font-size: 11px; color: rgba(40, 36, 28, 0.92);
+}
+.sticky-menu .mi {
+  line-height: 26px; padding: 0 10px;
+  border-radius: 5px; cursor: pointer; white-space: nowrap;
+}
+.sticky-menu .mi:hover { background: rgba(0, 0, 0, 0.07); }
+@media (prefers-color-scheme: dark) {
+  .sticky-menu {
+    background: #2b2b30; color: rgba(240, 240, 245, 0.92);
+    border-color: rgba(255, 255, 255, 0.10);
+  }
+  .sticky-menu .mi:hover { background: rgba(255, 255, 255, 0.10); }
+}
+
+/* ---- 统一滚动条（R166b：全组件细圆角悬浮拇指，浅/深色） ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.35);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 140, 150, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
+}

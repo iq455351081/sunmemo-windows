@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <img id="appIcon" alt="">
+      <div>
+        <div class="h1">SunMemo (晾想法) 偏好设置</div>
+        <div class="h2">自定义全局快捷键与剪贴板防误触</div>
+      </div>
+    </div>
+    <hr>
+    <div class="panel">
+      <div class="pt">⌨️ 全局快捷键（点击即可自定义录制）</div>
+      <div class="hk-row">
+        <div class="hk-desc"><div class="hk-t">呼出 / 隐藏晾衣绳</div><div class="hk-s">下拉或收起屏幕顶部的晾衣绳</div></div>
+        <button class="sc-btn" id="btn-toggle"></button>
+      </div>
+      <div class="hk-row">
+        <div class="hk-desc"><div class="hk-t">弹出桌面窗口写便签</div><div class="hk-s">弹出一个大便签窗口，写完点挂上</div></div>
+        <button class="sc-btn" id="btn-memo"></button>
+      </div>
+      <div class="hk-row">
+        <div class="hk-desc"><div class="hk-t">挂上当前剪贴板内容</div><div class="hk-s">截完图或复制文本后，按此键立即夹到绳上</div></div>
+        <button class="sc-btn" id="btn-paste"></button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="pt">📋 剪贴板、声效与外观</div>
+      <label class="chk-row">
+        <input type="checkbox" id="chkAutoHang">
+        <span><span class="ct">自动将新复制的截图挂上绳</span><br><span class="cs">若关闭：复制普通图片绝不自动打扰，只在按快捷键或点击按钮时挂上。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkSound">
+        <span><span class="ct">声效</span><br><span class="cs">挂绳、打勾与撕下便签时的轻巧音效。</span></span>
+      </label>
+      <div class="chk-row" style="align-items:center">
+        <span class="ct" style="min-width:64px">主题色</span>
+        <div id="themeRow" style="display:flex;gap:8px"></div>
+      </div>
+      <label class="chk-row">
+        <input type="checkbox" id="chkGpu">
+        <span><span class="ct">硬件加速渲染（实验）</span><br><span class="cs">磨砂玻璃与动画交给 GPU。若显卡驱动不稳定，开启后可能再次卡顿，关闭即恢复流畅（需重启）。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkBeacon">
+        <span><span class="ct">待机发光信标</span><br><span class="cs">晾衣绳隐藏时，屏幕顶中显示呼吸发光的小太阳，点击展开。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkNotify">
+        <span><span class="ct">挂绳气泡通知</span><br><span class="cs">有新内容挂上晾衣绳时弹出系统气泡提醒。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkLogin">
+        <span><span class="ct">开机自动启动</span><br><span class="cs">登录 Windows 后自动常驻后台，晾衣绳随叫随到。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkPower">
+        <span><span class="ct">节电模式</span><br><span class="cs">暂停风摆等所有环境动画，最低 GPU/ CPU 占用。</span></span>
+      </label>
+      <label class="chk-row">
+        <input type="checkbox" id="chkWind">
+        <span><span class="ct">环境风声</span><br><span class="cs">极轻的白噪声循环，营造晾衣绳的户外感。</span></span>
+      </label>
+      <div class="chk-row" style="align-items:center">
+        <span class="ct" style="min-width:64px">卡片字号</span>
+        <div id="fontRow" style="display:flex;gap:6px"></div>
+      </div>
+      <div class="chk-row" style="align-items:center">
+        <span class="ct" style="min-width:64px">外观</span>
+        <button id="resetAppearance" style="font-family:inherit;font-size:11px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;padding:4px 12px;cursor:pointer;background:#fff">恢复默认外观</button>
+      </div>
+      <div class="chk-row" style="align-items:center">
+        <span class="ct" style="min-width:64px">音量</span>
+        <input type="range" id="vol" min="10" max="100" step="5" aria-label="音量" style="flex:1;accent-color:#0a84ff">
+        <span class="cs" id="volLabel" style="min-width:36px"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="pt-row"><span class="pt">🔄 软件版本与自动更新</span><span class="ver" id="ver"></span></div>
+      <div class="upd-row">
+        <label class="chk-row inline">
+          <input type="checkbox" id="chkAutoUpdate">
+          <span class="ct">启动时自动检查新版本</span>
+        </label>
+        <button id="checkBtn">检查更新</button>
+      </div>
+      <div class="upd-status" id="updStatus"></div>
+    </div>
+    <div class="foot">
+      <button id="resetBtn">恢复默认快捷键</button>
+      <span class="foot-spacer"></span>
+      <button id="doneBtn">完成</button>
+    </div>
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>

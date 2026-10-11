@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../common.css">
+<link rel="stylesheet" href="search.css">
+</head>
+<body>
+  <div id="panel">
+    <div class="search-row">
+      <span class="ic" id="searchIcon"></span>
+      <input id="q" type="text" placeholder="搜索便签…（回车打开第一条）" aria-label="搜索便签" autofocus>
+      <button id="closeBtn" title="关闭 (Esc)" aria-label="关闭"></button>
+    </div>
+    <div id="tagRow"></div>
+    <div id="list"></div>
+    <div class="foot-hint">↑↓ 选择 · 回车打开 · 双击卡片可编辑</div>
+  </div>
+  <script src="../common.js"></script>
+  <script src="search.js"></script>
+</body>
+</html>

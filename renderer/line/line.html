@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../common.css">
+<link rel="stylesheet" href="line.css">
+</head>
+<body>
+  <div id="stage">
+    <svg id="rope" aria-hidden="true"></svg>
+    <div id="cards" role="list" aria-label="晾衣绳便签"></div>
+    <div id="topButtons">
+      <button id="hangClip" class="glass capsule-btn" title="将当前剪贴板里的图片或文本挂上晾衣绳 (Ctrl+Alt+V)" aria-label="挂上剪贴板">
+        <span class="ic" id="hangClipIcon" aria-hidden="true"></span><span id="hangClipText">挂上剪贴板</span>
+      </button>
+      <button id="gear" class="glass gear-btn" title="自定义快捷键与防误触设置" aria-label="设置"><span class="ic" aria-hidden="true"></span></button>
+    </div>
+    <div id="hint" class="hint glass">
+      <span class="ic"></span><span>截图后将晾在这里 · Ctrl+Alt+N 记一条</span>
+    </div>
+  </div>
+  <script src="../../src/layout.js"></script>
+  <script src="../common.js"></script>
+  <script src="line.js"></script>
+</body>
+</html>

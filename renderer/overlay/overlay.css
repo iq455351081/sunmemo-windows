@@ -1,0 +1,347 @@
+/* Hero preview overlay — MemoPreviewWindow.swift port. */
+
+:root {
+  --label: rgba(28, 26, 22, 0.94);
+  --secondary: rgba(60, 60, 67, 0.62);
+  --green: #34c759;
+  --red: #ff453a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+html, body {
+  background: transparent;
+  overflow: hidden;
+  width: 100vw; height: 100vh;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  color: var(--label);
+}
+
+#backdrop {
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(20, 16, 28, 0.9), rgba(0, 0, 0, 0.9));
+  opacity: 0;
+  transition: opacity var(--dur-view) cubic-bezier(0.30, 1.0, 0.64, 1);
+  cursor: default;
+}
+
+/* ---- elastic tether ------------------------------------------------------- */
+#cord {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  opacity: 0;
+}
+#peg {
+  position: fixed;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ---- clothespins ------------------------------------------------------------ */
+.ring {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  border: 1.2px solid;
+  border-image: none;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.18), inset 0 0 2px rgba(0,0,0,0.25);
+}
+.pin {
+  position: relative;
+  width: 13px; height: 24px;
+  margin-top: -3px;
+  margin-left: auto; margin-right: auto;
+  border-radius: 3.5px;
+  background: linear-gradient(to right, #b3b3b3, #ededed 35%, #d1d1d1 65%, #9e9e9e);
+  box-shadow:
+    0 1px 2.5px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 0.6px rgba(255, 255, 255, 0.55);
+}
+.pin::after {
+  content: '';
+  position: absolute;
+  top: 8.5px; left: 50%;
+  width: 5px; height: 1.4px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.hero-suspension {
+  position: absolute;
+  left: 50%; top: -36px;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.22));
+}
+
+/* ---- the hero card ------------------------------------------------------------ */
+#heroWrap {
+  position: fixed;
+  transform-origin: 50% 0;
+  will-change: transform, opacity;
+}
+#heroCard {
+  position: relative;
+  border-radius: 18px;
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  background: rgba(252, 252, 252, 0.35);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+body.sw #heroCard {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(252, 252, 252, 0.92);
+}
+#heroCard::before {
+  content: '';
+  position: absolute; inset: -0.5px;
+  border-radius: 18px;
+  border: 0.5px solid rgba(0, 0, 0, 0.10);
+  pointer-events: none;
+  z-index: 3;
+}
+#heroCard::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 18px;
+  padding: 0.75px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.hero-inner { display: flex; flex-direction: column; height: 100%; }
+.hero-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 16px 20px 10px;
+}
+.hero-head .divider-top, .hero-body + .divider { display: contents; }
+.divider { height: 1px; background: rgba(0, 0, 0, 0.10); margin: 0 16px; opacity: 0.65; }
+
+.stats-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.55);
+  color: rgba(30, 30, 30, 0.80);
+}
+.stats-pill.all { color: #1f9d48; }
+.stats-pill svg { width: 11.5px; height: 11.5px; }
+.hero-spacer { flex: 1; }
+
+.ratio-pills {
+  display: inline-flex; gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.04);
+}
+.ratio-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: inherit;
+  font-size: 10px; font-weight: 500;
+  color: var(--secondary);
+  background: rgba(255, 255, 255, 0.4);
+  border: 0; cursor: pointer;
+  border-radius: 5px;
+  padding: 3px 6px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.ratio-pill .sym { font-size: 9.5px; font-weight: 700; }
+.ratio-pill.active { background: rgba(0, 0, 0, 0.12); color: var(--label); }
+
+.hero-time { font-size: 11.5px; font-weight: 500; color: rgba(60, 60, 67, 0.55); white-space: nowrap; }
+.close-x {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 0; cursor: pointer;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--secondary);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.close-x svg { width: 10px; height: 10px; }
+.close-x:hover { background: rgba(0, 0, 0, 0.12); }
+
+.name-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600;
+  color: rgba(30, 30, 30, 0.72);
+  padding: 3.5px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.5);
+  max-width: 420px;
+}
+.name-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.hero-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent, #ff8f1f) transparent;
+  overscroll-behavior: contain;
+}
+@media (prefers-color-scheme: dark) {
+  .hero-body { scrollbar-color: rgba(255, 170, 60, 0.5) transparent; }
+}
+.hero-body::-webkit-scrollbar { width: 8px; }
+.hero-body::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.18); border-radius: 4px; }
+
+.hero-foot { padding: 9px 18px 12px; }
+.hero-actions { display: flex; align-items: center; gap: 10px; }
+.act-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit;
+  font-size: 11.5px; font-weight: 600;
+  border: 0; cursor: pointer;
+  border-radius: 99px;
+  padding: 6px 13px;
+  color: var(--label);
+  background: rgba(255, 255, 255, 0.65);
+  transition: transform 120ms ease, background 150ms ease, color 150ms ease;
+}
+.act-btn:hover { transform: translateY(-1px); }
+.act-btn svg { width: 11px; height: 11px; }
+.act-btn.ok { color: #1f9d48; }
+.act-btn.danger { color: rgba(255, 59, 48, 0.90); background: rgba(255, 255, 255, 0.45); }
+.act-btn.primary { background: rgba(0, 0, 0, 0.82); color: #fff; }
+.act-btn.ghost { font-weight: 500; background: rgba(255, 255, 255, 0.55); }
+.hero-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(60, 60, 67, 0.55);
+}
+
+/* markdown body (bigger than card) */
+#heroCard .md-todo { gap: 6px; }
+#heroCard .md-box { width: 13px; height: 13px; margin-top: 2px; }
+#heroCard .md-box svg { width: 10px; height: 10px; }
+#heroCard .md-todo-text, #heroCard .md-p { font-size: 13.5px; font-weight: 400; white-space: normal; }
+#heroCard .md-h { font-size: 15px; padding-top: 2px; }
+#heroCard .md-li { font-size: 13.5px; font-weight: 400; }
+#heroCard .md-li span:last-child { white-space: normal; }
+#heroCard .md-todo-text { word-break: break-word; }
+#heroCard .md-quote { font-size: 12.5px; white-space: normal; }
+#heroCard .md-empty { font-size: 13px; color: rgba(60, 60, 67, 0.5); padding-top: 10px; }
+#heroCard code { background: rgba(0, 0, 0, 0.07); border-radius: 4px; padding: 0 4px; font-family: Consolas, monospace; font-size: 0.9em; }
+
+/* photo hero */
+.photo-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 4px 12px; min-height: 0; overflow: auto; }
+.photo-area img {
+  max-width: 100%; max-height: 100%;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25), 0 4px 14px rgba(0, 0, 0, 0.18);
+  /* rotate/zoom 合成层动画：只动 transform，不触发布局重排 */
+  transition: transform 260ms var(--ease-spring, cubic-bezier(0.26, 1.32, 0.48, 1));
+}
+
+.hidden { display: none; }
+
+/* ---- flight & fall fx --------------------------------------------------------- */
+.fx-card {
+  position: fixed;
+  border-radius: 18px;
+  transform-origin: 50% 0;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.30);
+  will-change: transform, opacity;
+  overflow: hidden;
+}
+.fx-card .fx-peg {
+  position: absolute;
+  top: -24px; left: 50%;
+  transform: translateX(-50%);
+  width: 11px; height: 24px;
+  border-radius: 3.5px;
+  background: linear-gradient(to right, #b3b3b3, #ededed 35%, #d1d1d1 65%, #9e9e9e);
+}
+.fx-inner { width: 100%; height: 100%; padding: 14px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.fx-inner .fx-line { border-radius: 6px; background: rgba(30, 28, 24, 0.55); height: 10px; }
+.fx-inner .fx-line.w60 { width: 60%; }
+.fx-inner .fx-line.w80 { width: 80%; }
+.fx-inner .fx-head { font-size: 18px; font-weight: 700; color: rgba(30, 28, 24, 0.85); margin-bottom: 4px; }
+.fx-inner img { width: 100%; height: 100%; object-fit: cover; }
+
+/* dark-mode */
+
+
+.zoom-reset {
+  position: absolute;
+  top: 10px; right: 14px;
+  border: 0; cursor: pointer;
+  font-family: inherit;
+  font-size: 10.5px; font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 99px;
+  padding: 3px 10px;
+  z-index: 5;
+  transition: opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+.zoom-reset.show { opacity: 1; pointer-events: auto; }
+.zoom-reset:hover { background: rgba(0, 0, 0, 0.75); }
+
+/* R56 预览标签 chips */
+.tag-chip { transition: transform 140ms cubic-bezier(0.26, 1.4, 0.48, 1), background 140ms ease; }
+.tag-chip:active { transform: scale(0.92); background: rgba(255, 143, 31, 0.35); }
+
+/* dark-mode: the dim backdrop deepens slightly; pastel cards keep dark text */
+.tag-chip {
+  display: inline-block;
+  font-size: 10.5px; font-weight: 600;
+  color: rgba(90, 70, 20, 0.8);
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+
+/* dark-mode: the dim backdrop deepens slightly; pastel cards keep dark text */
+@media (prefers-color-scheme: dark) {
+  #backdrop { background: #000; }
+  #heroCard { background: rgba(38, 38, 44, 0.35); }
+  /* R104: photo 预览头部控件在深色下的可读性
+     （.divider 用 background 而非 border、.hero-head 无边框 — 无 border 规则可改，跳过） */
+  #heroCard .hero-head .name-pill, #heroCard .close-x, #heroCard .hero-hint, #heroCard .act-btn.ghost { color: rgba(235, 235, 240, 0.9); }
+  #heroCard .act-btn.ghost { background: rgba(255, 255, 255, 0.10); }
+}
+body.sw #heroCard { background: rgba(252, 252, 252, 0.92); }
+@media (prefers-color-scheme: dark) {
+  body.sw #heroCard { background: rgba(250, 250, 250, 0.94); }
+}
+
+/* R100: hero footer buttons must keep their natural width — the flex row
+   squeezed them below text width and labels wrapped mid-word ("复制全/文"). */
+.act-btn { flex: none; white-space: nowrap; }
+.hero-actions { flex-wrap: wrap; row-gap: 8px; }
+.hero-card .tag-chip { white-space: nowrap; flex: none; }
+
+/* R101: the filename pill opens the image — make it read as a button */
+.name-pill[data-act="open"] { cursor: pointer; transition: background 140ms ease; }
+.name-pill[data-act="open"]:hover { background: rgba(255, 255, 255, 0.85); }
+
+/* ---- 统一滚动条（R166b：全组件细圆角悬浮拇指，浅/深色） ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.35);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 140, 150, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
+}

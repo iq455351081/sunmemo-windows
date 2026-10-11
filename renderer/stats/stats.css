@@ -1,0 +1,128 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: transparent; height: 100%;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  color: rgba(28, 26, 22, 0.94); user-select: none;
+}
+#panel {
+  height: calc(100vh - 16px); margin: 8px;
+  border-radius: 14px; background: #fbfbfd;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;
+}
+.head { display: flex; align-items: center; }
+.head .t { font-size: 14px; font-weight: 700; flex: 1; }
+#closeBtn {
+  width: 22px; height: 22px; border: 0; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06); color: rgba(60, 60, 67, 0.65);
+  cursor: pointer; font-size: 11px;
+}
+#closeBtn:hover { background: rgba(0, 0, 0, 0.12); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat {
+  background: rgba(0, 0, 0, 0.035); border-radius: 10px;
+  padding: 12px; text-align: center;
+}
+.stat .n { font-size: 24px; font-weight: 700; color: #ff8f1f; }
+.stat .l { font-size: 11px; color: #8a8a90; margin-top: 3px; }
+.bar-wrap { background: rgba(0, 0, 0, 0.035); border-radius: 10px; padding: 12px; }
+.bl { font-size: 11.5px; font-weight: 600; margin-bottom: 7px; }
+.bar { height: 10px; border-radius: 99px; background: rgba(0, 0, 0, 0.08); overflow: hidden; }
+#panel { scrollbar-color: rgba(255, 143, 31, 0.6) transparent; scrollbar-width: thin; }
+@media (prefers-color-scheme: dark) {
+  #panel { scrollbar-color: rgba(255, 170, 60, 0.4) transparent; }
+}
+.fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ffb14a, #ff6a5f); width: 0; transition: width 600ms cubic-bezier(0.26, 1.2, 0.48, 1); }
+.bl2 { font-size: 10.5px; color: #8a8a90; margin-top: 5px; text-align: right; }
+.tip { font-size: 10.5px; color: #a0a0a6; text-align: center; margin-top: auto; }
+/* R60 7日趋势条 */
+.trend { background: rgba(0,0,0,0.035); border-radius: 10px; padding: 12px; }
+.trend .bl { font-size: 11.5px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: baseline; }
+.trend .bl .cmp { margin-left: auto; font-size: 11px; font-weight: 500; color: #8a8a90; }
+.trend .bl .cmp .up { color: #34a853; }
+.trend .bl .cmp .down { color: #ff453a; }
+.trend .bl .cmp .flat { color: #a0a0a6; }
+.trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 46px; }
+.trend-bars .tb { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+.trend-bars .tb .col { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #ffb14a, #ff8f1f); min-height: 3px; }
+.trend-bars .tb .dl { font-size: 9px; color: #a0a0a6; }
+.tb .col { position: relative; transition: filter 120ms ease, transform 120ms ease; }
+.tb .col:hover { filter: brightness(1.18); transform: scaleY(1.06); transform-origin: bottom; outline: 1.5px solid rgba(255, 143, 31, 0.9); outline-offset: 1px; }
+.tb .col:hover::after {
+  content: attr(data-n);
+  position: absolute; top: -16px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75); color: #fff;
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  white-space: nowrap;
+}
+.recycle { background: rgba(0,0,0,0.035); border-radius: 10px; padding: 10px 12px; }
+#recycleList { max-height: 132px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,143,31,0.5) transparent; }
+.recycle .bl { font-size: 11.5px; font-weight: 600; margin-bottom: 6px; }
+.rec-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; }
+.rec-row .rt { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(28,26,22,0.8); }
+.rec-row .rt2 { color: #a0a0a6; font-size: 10px; flex: none; }
+.rec-row button { border: 0; border-radius: 6px; padding: 2px 8px; font-size: 10px; cursor: pointer; font-family: inherit; background: #0a84ff; color: #fff; }
+.rec-row button.del { background: rgba(255, 69, 58, 0.85); }
+.rec-empty { font-size: 10.5px; color: #a0a0a6; }
+/* 趋势块 CSV 导出小按钮（胶囊，与 #closeBtn 同系） */
+#csvBtn {
+  border: 0; margin-left: 6px; padding: 1px 7px;
+  border-radius: 99px; font-size: 10.5px; line-height: 1.5;
+  font-family: inherit; cursor: pointer;
+  background: rgba(0, 0, 0, 0.06); color: rgba(60, 60, 67, 0.75);
+  transition: background 120ms ease, transform 120ms ease;
+}
+#csvBtn:hover { background: rgba(255, 143, 31, 0.18); }
+#csvBtn:active { transform: scale(0.94); }
+/* R155 本 7 日 / 上 7 日 切换胶囊（激活态 sunrise 渐变高亮） */
+.win-sw { display: inline-flex; margin-left: 8px; padding: 1px; border-radius: 99px; background: rgba(0, 0, 0, 0.06); }
+.win-sw .ws {
+  border: 0; padding: 1px 8px; border-radius: 99px;
+  font-size: 10px; line-height: 1.5; font-family: inherit; cursor: pointer;
+  background: transparent; color: rgba(60, 60, 67, 0.65);
+  transition: background 120ms ease, color 120ms ease;
+}
+.win-sw .ws.on { background: linear-gradient(135deg, #ffb14a, #ff6a5f); color: #fff; font-weight: 600; }
+
+@media (prefers-color-scheme: dark) {
+  .rec-empty { color: #8f8f9a; }
+  .recycle, .trend { background: rgba(255,255,255,0.05); }
+  .rec-row .rt { color: rgba(240,240,245,0.85); }
+  .rec-row .rt2, .tb .dl { color: #8f8f9a; }
+  .trend .bl .cmp { color: #8f8f9a; }
+  .rec-row button { background: #0a84ff; }
+  .rec-row button.del { background: rgba(255, 69, 58, 0.9); }
+}
+
+@media (prefers-color-scheme: dark) {
+  #panel { background: #232328; border-color: rgba(255,255,255,0.08); color: rgba(240,240,245,0.94); }
+  .stat { background: rgba(255,255,255,0.05); }
+  #csvBtn { background: rgba(255,255,255,0.09); color: rgba(230,230,238,0.75); }
+  #csvBtn:hover { background: rgba(255, 170, 60, 0.25); }
+  .win-sw { background: rgba(255,255,255,0.09); }
+  .win-sw .ws { color: rgba(230,230,238,0.65); }
+  .bar-wrap { background: rgba(255, 255, 255, 0.05); } /* R104: 深色下条形图容器同 .stat/.trend 提亮 */
+  .stat .l, .bl2, .tip { color: #8f8f9a; }
+  .bar { background: rgba(255,255,255,0.10); }
+  #closeBtn { background: rgba(255,255,255,0.09); color: rgba(230,230,238,0.7); }
+  /* R91: 深色下气泡反白，避免深底贴深底看不清 */
+  .tb .col:hover::after { background: rgba(245,245,250,0.92); color: #1c1a16; }
+}
+
+/* ---- 统一滚动条（R166b：全组件细圆角悬浮拇指，浅/深色） ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.35);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 140, 150, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
+}
