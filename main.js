@@ -1492,7 +1492,7 @@ async function exportMemoPng(id) {
   // R164: Esc on the rope page tucks it away (user expectation from previews)
   ipcMain.on('line:toggle', () => toggle());
   ipcMain.on('line:open', id => store.open(id));
-  ipcMain.on('line:trash', id => store.trash(id));
+  ipcMain.on('line:trash', (_e, id) => store.trash(id)); // R186: 曾缺 _e（首参是 event）——移到回收站永不命中
   // 标记 — the Windows stand-in for macOS Markup: open the image in MS Paint.
   ipcMain.on('line:markup', (_e, id) => {
     const item = store.find(id);

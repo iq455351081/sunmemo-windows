@@ -434,7 +434,9 @@ class LineStore {
     return id;
   }
 
-  trash(id) {
+  trash(idOrPayload) {
+    // R186: 调用方形状不一（字符串 id 或 {id}）——统一取 id，否则 find 永不命中
+    const id = typeof idOrPayload === 'object' && idOrPayload ? idOrPayload.id : idOrPayload;
     const item = this.find(id);
     if (!item) return;
     if (item.kind === 'memo') {
@@ -446,10 +448,11 @@ class LineStore {
       this.drop(id, { quietly: true });
       return;
     }
-    shell_trash(item.url).then(ok => {
-      if (ok) { this.play('trash', 0.5); this.drop(id, { quietly: true }); }
-      else this.play('beep', 0.4);
-    });
+    // R186: 先移除卡片（释放渲染器对图片文件的句柄），再入回收站——
+    // 句柄未释放时 trashItem/rmSync 都会失败
+    this.play('trash', 0.5);
+    this.drop(id, { quietly: true });
+    setTimeout(() => { shell_trash(item.url); }, 700);
   }
 
   open(id) {
@@ -477,17 +480,13 @@ function clampTilt(t) {
 }
 
 async function shell_trash(file) {
-  // Windows: move to Recycle Bin via PowerShell (VBDoShell)。Fall back to delete.
+  // R186: Electron 原生回收站 API——此前的 PowerShell COM MoveHere 在部分
+  // 机器上静默失败（图片"移到回收站"后条目不消失）。失败时兜底直接删除。
   try {
-    const { execFile } = require('child_process');
-    const ps = `(New-Object -ComObject Shell.Application).NameSpace(10).MoveHere('${file.replace(/'/g, "''")}')`;
-    await new Promise((resolve, reject) => {
-      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], err => err ? reject(err) : resolve());
-    });
-    return true;
-  } catch {
-    try { fs.rmSync(file, { force: true }); return true; } catch { return false; }
-  }
+    const ok = await require('electron').shell.trashItem(file);
+    if (ok) return true;
+  } catch { /* fall through */ }
+  try { fs.rmSync(file, { force: true }); return true; } catch { return false; }
 }
 
 module.exports = { LineStore, calculateTodoStats };
