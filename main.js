@@ -1461,6 +1461,8 @@ async function exportMemoPng(id) {
   ipcMain.on('line:reveal', id => store.reveal(id));
   // R150: 空格临时预览 —— 4 秒 peek，之后走常规自动收回（peekUntil 挡住收回判定）。
   ipcMain.on('line:peek', () => reveal({ peekFor: 4 }));
+  // R164: Esc on the rope page tucks it away (user expectation from previews)
+  ipcMain.on('line:toggle', () => toggle());
   ipcMain.on('line:open', id => store.open(id));
   ipcMain.on('line:trash', id => store.trash(id));
   // 标记 — the Windows stand-in for macOS Markup: open the image in MS Paint.

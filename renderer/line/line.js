@@ -1005,6 +1005,13 @@ window.addEventListener('wheel', ev => {
 window.addEventListener('resize', layout);
 // R150: 空格临时预览 —— 无输入焦点时按空格让线条垂降 4 秒（peek），再输入框不受影响。
 document.addEventListener('keydown', ev => {
+  // R164: Esc 收起晾衣绳（与预览的 Esc 语义一致）
+  if (ev.key === 'Escape') {
+    if (ev.target && ev.target.closest && ev.target.closest('input,textarea,[contenteditable]')) return;
+    ev.preventDefault();
+    api.send('line:toggle');
+    return;
+  }
   if (ev.code !== 'Space') return;
   if (ev.target && ev.target.closest && ev.target.closest('input,textarea,[contenteditable]')) return;
   ev.preventDefault();
