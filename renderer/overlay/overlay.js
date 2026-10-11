@@ -227,17 +227,20 @@ function initialScale() {
   return Math.max(0.40, Math.min(0.68, pv.origin.w / size.w));
 }
 
-function dismissPreview() {
+function dismissPreview(instant = false) {
   if (!pv) return;
-  animatePreview(1, 0, 430);
   pv = null;
-  setTimeout(() => {
+  // R165: Esc 立即消失；点击空白快速收起（原 430ms 弹簧+380ms 延迟被感知为迟钝）
+  const hide = () => {
     heroWrap.classList.add('hidden');
     pegEl.classList.add('hidden');
     cordSvg.style.opacity = 0;
     backdrop.style.opacity = 0;
     api.send('overlay:close');
-  }, 380);
+  };
+  if (instant) { hide(); return; }
+  animatePreview(1, 0, 240);
+  setTimeout(hide, 210);
 }
 
 // hero events
@@ -427,7 +430,8 @@ heroCard.addEventListener('mousedown', ev => {
 backdrop.addEventListener('click', dismissPreview);
 
 window.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' || ev.key === ' ') { ev.preventDefault(); dismissPreview(); }
+  if (ev.key === 'Escape') { ev.preventDefault(); dismissPreview(true); }
+  else if (ev.key === ' ') { ev.preventDefault(); dismissPreview(); }
   else if (ev.key === 'ArrowDown' || ev.key === 'j') { ev.preventDefault(); api.send('overlay:nav', 1); }
   else if (ev.key === 'ArrowUp' || ev.key === 'k') { ev.preventDefault(); api.send('overlay:nav', -1); }
   else if ((ev.key === 'e' || ev.key === 'E') && pv && pv.item.kind === 'memo') {

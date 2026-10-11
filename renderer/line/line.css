@@ -610,9 +610,10 @@ body[data-font="lg"] .md-h { font-size: 13.5px; }
 
 /* R98: 📌 pinned state — visible on/off feedback for the stay-open toggle */
 .gear-btn { transition: background 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
-.gear-btn.pinned { background: rgba(255, 143, 31, 0.9); border-color: rgba(255, 143, 31, 0.95); box-shadow: 0 0 8px rgba(255, 143, 31, 0.55); animation: pin-pop 240ms cubic-bezier(0.26, 1.2, 0.48, 1); }
+.gear-btn.unpinned { background: rgba(255, 143, 31, 0.9); border-color: rgba(255, 143, 31, 0.95); box-shadow: 0 0 8px rgba(255, 143, 31, 0.55); animation: pin-pop 240ms cubic-bezier(0.26, 1.2, 0.48, 1); }
 @keyframes pin-pop { 0% { transform: scale(0.82); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
-.gear-btn.pinned .ic { filter: grayscale(1) brightness(2.2); }
+.gear-btn.unpinned .ic { filter: grayscale(1) brightness(2.2); }
+
 
 /* R98 root cause: renderCardContent puts `.hit` on the visible paper itself
    (`.memo-face.hit`) for click-gating, but `.hit` is `position:absolute;

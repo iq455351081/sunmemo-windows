@@ -604,6 +604,9 @@ function mousemoveWork(ev) {
 }
 // R99: releasing a torn card below the strip sticks it to the desktop at the
 // drop point; releasing inside the strip snaps it back onto the line.
+document.addEventListener('mouseout', ev => {
+  if (!ev.relatedTarget) { const s = hoveredId && slots.get(hoveredId); if (s) setHoveredSlot(null); }
+});
 window.addEventListener('mouseup', ev => {
   if (dragState && dragState.tearing && dragState.moved) {
     const id = dragState.id;
@@ -912,6 +915,8 @@ function handleState(s) {
   // twice (on then off) because nothing on the button ever changed.
   pinViewBtn.classList.toggle('pinned', !!s.userPinned);
   pinViewBtn.title = s.userPinned ? '已盯住（点击取消常驻）' : '盯住（不再自动隐藏）';
+  // R165: 语义反转——深色(常规)=钉住，浅色高亮=未钉住（提醒绳会自动收起）
+  pinViewBtn.classList.toggle('unpinned', !s.userPinned);
   if (s.copiedID && s.copiedID !== prevCopied) {
     const sl = slots.get(s.copiedID);
     if (sl) nudge(sl, 3);
