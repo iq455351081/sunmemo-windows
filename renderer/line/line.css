@@ -660,3 +660,21 @@ body[data-font="lg"] .md-h { font-size: 13.5px; }
 }
 
 
+
+/* ---- R208: 悬停图片卡 → 原地放大 3 倍（Dock 式，设置 imgZoom 可关） ------
+   用户需求：小图看不清，悬停即大幅放大看清（3-5 倍），无需点开。
+   放大后置于最顶层压过邻卡；reduced-motion / 节电豁免。 */
+body.imgzoom .slot.hover .card.photo .photo-clip {
+  transform: scale(3);
+  transition: transform 340ms cubic-bezier(0.26, 1.2, 0.48, 1);
+  z-index: 3;
+}
+body.imgzoom .slot.hover .card.photo { z-index: 3; }
+body.imgzoom .slot.hover { z-index: 5000 !important; }
+body.imgzoom .slot.hover .card.photo .cardfx {
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.25);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.imgzoom .slot.hover .card.photo .photo-clip { transform: none; transition: none; }
+}
+body.power-save.imgzoom .slot.hover .card.photo .photo-clip { transform: none; }
