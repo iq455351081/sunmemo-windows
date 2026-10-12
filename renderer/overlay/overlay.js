@@ -589,7 +589,6 @@ function escapeHtml(s) {
 }
 
 api.on('show-preview', showPreview);
-api.send('overlay:ready');
 
 // ---- v1.6 文档悬停弹出阅读（line 悬停文档卡 320ms 后由主进程锚位弹出） ------
 let peekEl = null, peekDispose = null, peekItem = null, peekToken = 0;

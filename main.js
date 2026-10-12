@@ -1234,7 +1234,6 @@ function setSetting(key, value) {
   if (key === 'autoHang') watchers.autoHang = value;
   if (key === 'imgZoom') {
     try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('imgzoom', ${!!value})`).catch(() => {}); } catch { /* ignore */ }
-    if (overlayWin && !overlayWin.isDestroyed()) { try { overlayWin.webContents.send('imgzoom', !!value); } catch { /* ignore */ } }
   }
   if (key === 'compact') {
     try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('compact', ${!!value})`).catch(() => {}); } catch { /* ignore */ }

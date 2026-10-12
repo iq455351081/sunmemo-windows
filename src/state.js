@@ -222,7 +222,8 @@ class LineStore {
     } else if (docTypeOf(url)) {
       // 文档卡：不拷贝不改动，原文件挂在原位，绳只是视图。
       let st = null;
-      try { st = fs.statSync(url); } catch { return null; }
+      try { st = fs.statSync(url); } catch (e) { if (process.env.SUNMEMO_DOC_TRACE) console.log('[doc] stat fail', url, e.message); return null; }
+      if (process.env.SUNMEMO_DOC_TRACE) console.log('[doc] hang', docTypeOf(url), path.basename(url));
       item = {
         id: uuid(), kind: 'doc', url,
         tilt: this.tilts[url] != null ? clampTilt(this.tilts[url]) : rand(-2.5, 2.5),
