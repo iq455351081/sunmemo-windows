@@ -524,6 +524,10 @@ cardsEl.addEventListener('mouseover', ev => {
   const hit = ev.target.closest && ev.target.closest('.hit');
   const slotEl = hit && hit.closest('.slot');
   setHoveredSlot((slotEl && slotEl.dataset && slotEl.dataset.id) || null);
+  // R207: 图片卡直达触发（同一槽重复进入也刷新）
+  try {
+    if (slotEl && slotEl.querySelector('.photo-clip') && document.body.classList.contains('imgzoom')) showImageMagnify(slotEl);
+  } catch { /* ignore */ }
 });
 cardsEl.addEventListener('mouseleave', () => setHoveredSlot(null));
 api.on('line:cool', () => setHoveredSlot(null));
@@ -921,8 +925,8 @@ function showImageMagnify(slotEl) {
   magTimer = setTimeout(() => {
     if (magFor !== item.id || !document.body.classList.contains('imgzoom')) return;
     const r = slotEl.getBoundingClientRect();
-    const w = Math.min(480, Math.round(innerWidth * 0.4));
-    const h = Math.min(220, Math.round(w * 0.62));
+    const w = Math.min(640, Math.round(innerWidth * 0.45));
+    const h = Math.min(460, Math.round(w * 0.68));
     magEl = document.createElement('div');
     magEl.id = 'imgMagnify';
     magEl.style.cssText = 'position:fixed;z-index:150000;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 18px 44px rgba(0,0,0,0.35);opacity:0;transform:scale(0.92);transition:opacity 200ms ease,transform 220ms cubic-bezier(0.26,1.2,0.48,1);pointer-events:none;';
