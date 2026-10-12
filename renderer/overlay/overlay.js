@@ -412,53 +412,7 @@ heroCard.addEventListener('wheel', ev => {
   })();
 }, { passive: false });
 
-// R206+: 悬停自动放大（光标处放大镜 1.8x，设置可关）——滚轮仍可继续放大
-let imgZoomEnabled = true, hoverZoomActive = false;
-window.sun.invoke('settings:data').then(d => { imgZoomEnabled = d.settings.imgZoom !== false; }).catch(() => {});
-api.on('imgzoom', v => { imgZoomEnabled = !!v; });
-// R207: 悬停放大镜（光标锚定 2.2x）+ 滞回边界——放大后图片_bounds 超出卡片，
-// 以 heroCard 矩形 +80px 容差判定离开，杜绝「进入→放大→出界→收回→再进入」振荡
-let lastClient = null;
-function hoverApproach(img) {
-  if (zoomRaf) cancelAnimationFrame(zoomRaf);
-  (function approach() {
-    zoomCurrent += (zoomTarget - zoomCurrent) * 0.22;
-    if (Math.abs(zoomTarget - zoomCurrent) < 0.005) zoomCurrent = zoomTarget;
-    applyPhotoTransform(img);
-    if (Math.abs(zoomTarget - zoomCurrent) > 0.001) zoomRaf = requestAnimationFrame(approach);
-  })();
-}
-heroCard.addEventListener('mousemove', ev => {
-  lastClient = { x: ev.clientX, y: ev.clientY };
-  if (!pv || pv.item.kind !== 'image' || !imgZoomEnabled) return;
-  const area = heroCard.querySelector('.photo-area');
-  const img = area && area.querySelector('img');
-  if (!img) return;
-  const r = img.getBoundingClientRect();
-  const nx = Math.min(Math.max((ev.clientX - r.left) / r.width, 0), 1);
-  const ny = Math.min(Math.max((ev.clientY - r.top) / r.height, 0), 1);
-  img.style.transformOrigin = (nx * 100).toFixed(1) + '% ' + (ny * 100).toFixed(1) + '%';
-  if (!hoverZoomActive && zoomTarget <= 1.001) {
-    hoverZoomActive = true;
-    zoomTarget = 2.2;
-    hoverApproach(img);
-  }
-});
-heroCard.addEventListener('mouseleave', () => {
-  if (!hoverZoomActive) return;
-  // 滞回：离开 250ms 后仍在外（相对卡片矩形 +80px 容差）才收回
-  const lc = lastClient;
-  setTimeout(() => {
-    if (!hoverZoomActive || !lc) return;
-    const r = heroCard.getBoundingClientRect();
-    const inside = lc.x > r.left - 80 && lc.x < r.right + 80 && lc.y > r.top - 80 && lc.y < r.bottom + 80;
-    if (inside) return;
-    hoverZoomActive = false;
-    zoomTarget = 1;
-    const img = heroCard.querySelector('.photo-area img');
-    if (img) hoverApproach(img);
-  }, 250);
-});
+
 
 // R60: 点击标签 → 打开搜索并按该标签预筛选
 heroCard.addEventListener('click', ev => {

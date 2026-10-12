@@ -513,6 +513,12 @@ function setHoveredSlot(id) {
   const next = id && slots.get(id);
   if (next && next.el) next.el.classList.add('hover');
   applyPeek();
+  // R207: 悬停图片卡 → 浮出大图速览（350ms 悬停意图，移开即收；设置 imgZoom 可关）
+  try {
+    const el = id && slots.get(id);
+    if (el && el.querySelector && el.querySelector('.photo-clip') && document.body.classList.contains('imgzoom')) showImageMagnify(el);
+    else hideImageMagnify();
+  } catch { /* ignore */ }
 }
 cardsEl.addEventListener('mouseover', ev => {
   const hit = ev.target.closest && ev.target.closest('.hit');
@@ -899,6 +905,36 @@ function showHintToast(text) {
   toast.textContent = text;
   stage.appendChild(toast);
   setTimeout(() => { const t = document.getElementById('hintToast'); if (t) { t.style.opacity = '0'; t.style.transition = 'opacity 300ms'; setTimeout(() => t.remove(), 320); } }, 2600);
+}
+// R207: 悬停图片卡 → 浮动大图速览（Quick Look 式；设置 imgZoom 可关）
+let magEl = null, magTimer = null, magFor = null;
+function hideImageMagnify() {
+  if (magTimer) { clearTimeout(magTimer); magTimer = null; }
+  if (magEl) { const m = magEl; magEl = null; magFor = null; m.style.opacity = '0'; m.style.transform = 'scale(0.92)'; setTimeout(() => { try { m.remove(); } catch {} }, 200); }
+}
+function showImageMagnify(slotEl) {
+  const item = state.items.find(i => i.id === slotEl.dataset.id) || null;
+  if (!item || item.kind !== 'image' || !item.fileUrl) { hideImageMagnify(); return; }
+  if (magFor === item.id && magEl) return;
+  hideImageMagnify();
+  magFor = item.id;
+  magTimer = setTimeout(() => {
+    if (magFor !== item.id || !document.body.classList.contains('imgzoom')) return;
+    const r = slotEl.getBoundingClientRect();
+    const w = Math.min(480, Math.round(innerWidth * 0.4));
+    const h = Math.min(220, Math.round(w * 0.62));
+    magEl = document.createElement('div');
+    magEl.id = 'imgMagnify';
+    magEl.style.cssText = 'position:fixed;z-index:150000;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 18px 44px rgba(0,0,0,0.35);opacity:0;transform:scale(0.92);transition:opacity 200ms ease,transform 220ms cubic-bezier(0.26,1.2,0.48,1);pointer-events:none;';
+    magEl.style.width = w + 'px';
+    magEl.style.height = h + 'px';
+    const x = Math.max(12, Math.min(Math.round(r.left + r.width / 2 - w / 2), innerWidth - w - 12));
+    magEl.style.left = x + 'px';
+    magEl.style.top = Math.max(8, Math.round(r.bottom + 6)) + 'px';
+    magEl.innerHTML = '<img src="' + (state.items.find(i2 => i2.id === magFor).fileUrl || '') + '" style="width:100%;height:100%;object-fit:contain;background:#fff;display:block" draggable="false">';
+    document.body.appendChild(magEl);
+    requestAnimationFrame(() => { if (magEl) { magEl.style.opacity = '1'; magEl.style.transform = 'scale(1)'; } });
+  }, 350);
 }
 api.on('hint-toast', showHintToast);
 // R?: main.js 在新建/复制/截图生成便签后发送 'card-flash'（带 id）——
