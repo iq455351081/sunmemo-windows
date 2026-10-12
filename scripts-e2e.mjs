@@ -125,10 +125,20 @@ const run = async () => {
   }
   ok('E2E-02 悬停扇面让位(目标卡抬起)', t2);
 
-  // ---- T02b 悬停图片卡 → 图片放大 1.35x（R206 悬停放大镜） ----
+  // ---- T26 悬停图片卡 → 原地放大 3x（R208 Dock 式；设置 imgZoom 可关） ----
+  // 注意：采样值必须是有限数或 null——NaN 会让 `=== null` 与 `< 1.3` 两个
+  // 循环守卫同时失真（NaN 比较恒 false），曾把真通过判成 no-sample。
   {
-    let zoomScale = null;
-    for (let i = 0; i < 3 && zoomScale === null; i++) {
+    const readScale = `(() => {
+      const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip'));
+      if (!s) return JSON.stringify({ st: 'no-slot' });
+      const clip = s.querySelector('.photo-clip');
+      const m = getComputedStyle(clip).transform.match(/matrix\\(([-\\d.]+)/);
+      const v = m ? parseFloat(m[1]) : NaN;
+      return JSON.stringify({ st: 'ok', hover: s.classList.contains('hover'), v: Number.isFinite(v) ? v : null });
+    })()`;
+    let sample = null;
+    for (let i = 0; i < 3 && (!sample || sample.v === null); i++) {
       await line.evalIn(`(() => {
         const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip'));
         if (!s) return false;
@@ -137,24 +147,17 @@ const run = async () => {
         f.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
         return true;
       })()`);
-      await sleep(500); // 320ms 弹簧过渡
-      zoomScale = await line.evalIn(`(() => {
-        const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip'));
-        if (!s || !s.classList.contains('hover')) return null;
-        const clip = s.querySelector('.photo-clip');
-        const m = getComputedStyle(clip).transform.split(String.fromCharCode(40))[1] && parseFloat(getComputedStyle(clip).transform.split(String.fromCharCode(40))[1]);
-        return m ? parseFloat(m[1]) : null;
-      })()`);
-      if (zoomScale === null) await sleep(400);
+      await sleep(500); // 340ms 弹簧过渡
+      sample = await line.evalIn(readScale).then(JSON.parse).catch(() => null);
+      if (!sample || sample.v === null) await sleep(400);
     }
-    // 采样 3 次（320ms 过渡中读取可能取到中间态）
-    let diag = 'no-sample';
-    for (let k = 0; k < 3 && (zoomScale === null || zoomScale < 1.3); k++) {
+    // 320ms 过渡中读取可能取到中间态（如 2.94）：补采至稳态 3x
+    for (let k = 0; k < 4 && (!sample || sample.v === null || sample.v < 2.9); k++) {
       await sleep(300);
-      zoomScale = await line.evalIn(`(() => { const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip')); const m = getComputedStyle(s.querySelector('.photo-clip')).transform.match(/matrix\(([-\d.]+)/); return m ? parseFloat(m[1]) : null; })()`).catch(() => null);
-      if (zoomScale !== null && zoomScale >= 1.3) diag = 'scale=' + zoomScale;
+      sample = await line.evalIn(readScale).then(JSON.parse).catch(() => null);
     }
-    ok('E2E-26 悬停图片放大(1.35x)', zoomScale !== null && zoomScale >= 1.3, diag);
+    const passed = !!sample && sample.st === 'ok' && sample.hover && sample.v !== null && sample.v >= 2.9;
+    ok('E2E-26 悬停图片放大(3x)', passed, JSON.stringify(sample));
     await line.evalIn(`document.body.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))`);
     await sleep(400);
   }

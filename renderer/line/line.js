@@ -200,6 +200,15 @@ function renderCardContent(s) {
   const item = s.item;
   if (item.thumb) thumbCache.set(item.id, item.thumb);
   else if (thumbCache.has(item.id)) item.thumb = thumbCache.get(item.id);
+  // thumb 自愈：广播的 thumb 是一次性发送，跨窗口序列化（搜索/预览）或
+  // reload 竞态都可能让本窗错过唯一一次。缺了就向主进程拉一次。
+  if (item.kind === 'image' && !item.thumb && !s._thumbReq) {
+    s._thumbReq = true;
+    api.invoke('line:thumb', item.id).then(t => {
+      const cur = slots.get(item.id);
+      if (t && cur) { thumbCache.set(item.id, t); cur.item.thumb = t; cur.key = null; renderCardContent(cur); }
+    }).catch(() => { /* window closing etc. */ });
+  }
   const card = s.card;
   const key = item.kind === 'memo' ? JSON.stringify(item.memo) : (item.thumb ? item.thumb.slice(-48) + item.thumbW + item.thumbH : '');
   if (s.key === key && card.firstChild) return;
@@ -235,7 +244,8 @@ function renderCardContent(s) {
     clip.style.width = ps.w + 'px';
     clip.style.height = ps.h + 'px';
     const img = document.createElement('img');
-    img.src = item.thumb || '';
+    // thumb 未到手时不能写 src=''——空 src 会被解析成页面自身 URL（死链破图）
+    if (item.thumb) img.src = item.thumb;
     img.width = ps.w; img.height = ps.h;
     img.draggable = false;
     clip.appendChild(img);
@@ -518,10 +528,6 @@ cardsEl.addEventListener('mouseover', ev => {
   const hit = ev.target.closest && ev.target.closest('.hit');
   const slotEl = hit && hit.closest('.slot');
   setHoveredSlot((slotEl && slotEl.dataset && slotEl.dataset.id) || null);
-  // R207: 图片卡直达触发（同一槽重复进入也刷新）
-  try {
-    if (slotEl && slotEl.querySelector('.photo-clip') && document.body.classList.contains('imgzoom')) showImageMagnify(slotEl);
-  } catch { /* ignore */ }
 });
 cardsEl.addEventListener('mouseleave', () => setHoveredSlot(null));
 api.on('line:cool', () => setHoveredSlot(null));
@@ -570,7 +576,6 @@ window.addEventListener('mousemove', ev => {
 function mousemoveWork(ev) {
   const overSlot = !!(ev.target && ev.target.closest && ev.target.closest('.slot'));
   if (!overSlot && hoveredId) setHoveredSlot(null);
-  updateImageMagnify();
   if (dragState) {
     const dx = ev.screenX - dragState.x0, dy = ev.screenY - dragState.y0;
     if (Math.hypot(dx, dy) > 4) {
@@ -905,49 +910,7 @@ function showHintToast(text) {
   stage.appendChild(toast);
   setTimeout(() => { const t = document.getElementById('hintToast'); if (t) { t.style.opacity = '0'; t.style.transition = 'opacity 300ms'; setTimeout(() => t.remove(), 320); } }, 2600);
 }
-// R207: 悬停图片卡 → 浮动大图速览（Quick Look 式；设置 imgZoom 可关）
-// 关键：大图必须完整落在晾衣绳窗口内（高 ≤ 240），否则被窗口边界裁掉看不见。
-let magEl = null, magFor = null, magHideTimer = null;
-function hideImageMagnify() {
-  if (magHideTimer) { clearTimeout(magHideTimer); magHideTimer = null; }
-  if (magEl) { const m = magEl; magEl = null; magFor = null; m.style.opacity = '0'; m.style.transform = 'scale(0.92)'; setTimeout(() => { try { m.remove(); } catch {} }, 200); }
-}
-function showImageMagnify(slotEl) {
-  const item = state.items.find(i => i.id === slotEl.dataset.id) || null;
-  if (!item || item.kind !== 'image' || !item.fileUrl) { hideImageMagnify(); return; }
-  if (magFor === item.id && magEl) return;
-  hideImageMagnify();
-  magFor = item.id;
-  const r = slotEl.getBoundingClientRect();
-  const w = Math.min(640, Math.round(innerWidth * 0.45));
-  const h = 240;
-  magEl = document.createElement('div');
-  magEl.id = 'imgMagnify';
-  magEl.style.cssText = 'position:fixed;z-index:150000;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 18px 44px rgba(0,0,0,0.35);opacity:0;transform:scale(0.94);transition:opacity 180ms ease,transform 200ms cubic-bezier(0.26,1.2,0.48,1);pointer-events:none;';
-  magEl.style.width = w + 'px';
-  magEl.style.height = h + 'px';
-  // 放在卡片旁侧：优先右侧，空间不足放左侧；垂直贴窗口上部
-  let x = Math.round(r.right + 16);
-  if (x + w > innerWidth - 12) x = Math.round(r.left - w - 16);
-  x = Math.max(12, Math.min(x, innerWidth - w - 12));
-  magEl.style.left = x + 'px';
-  magEl.style.top = Math.max(8, Math.min(Math.round(r.top), innerHeight - h - 8)) + 'px';
-  magEl.innerHTML = '<img src="' + item.fileUrl + '" style="width:100%;height:100%;object-fit:contain;background:#fff;display:block" draggable="false">';
-  document.body.appendChild(magEl);
-  requestAnimationFrame(() => { if (magEl) { magEl.style.opacity = '1'; magEl.style.transform = 'scale(1)'; } });
-}
-// 状态机：悬停图片卡 → 显示；离开/换便签 → 延迟收起
-function updateImageMagnify() {
-  if (!document.body.classList.contains('imgzoom')) { hideImageMagnify(); return; }
-  const s = hoveredId && slots.get(hoveredId);
-  const isPhoto = !!(s && s.el && s.el.querySelector('.photo-clip'));
-  if (isPhoto) {
-    if (magHideTimer) { clearTimeout(magHideTimer); magHideTimer = null; }
-    if (!magEl || magFor !== hoveredId) showImageMagnify(s.el);
-  } else if (magEl && !magHideTimer) {
-    magHideTimer = setTimeout(() => { hideImageMagnify(); magHideTimer = null; }, 350);
-  }
-}
+
 api.on('hint-toast', showHintToast);
 // R?: main.js 在新建/复制/截图生成便签后发送 'card-flash'（带 id）——
 // 此前无监听，line.css 里的高亮光圈 .card-flash-ring 从未渲染过。

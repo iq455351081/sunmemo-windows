@@ -266,9 +266,11 @@ app.whenReady().then(async () => {
     if (!softGPU) return;
     win.webContents.executeJavaScript("document.body.classList.add('sw')").catch(() => {});
   };
-  [lineWin, overlayWin].forEach(w => w.webContents.once('did-finish-load', () => markSoftwareRendering(w)));
+  // .on 而非 .once：render-process-gone 自动重载后 renderer 的 thumbCache 是
+  // 空的，主进程 thumbSent 必须一并清零重发，否则图片卡永久变空盒；sw 类同理。
+  [lineWin, overlayWin].forEach(w => w.webContents.on('did-finish-load', () => markSoftwareRendering(w)));
 
-  lineWin.webContents.once('did-finish-load', () => {
+  lineWin.webContents.on('did-finish-load', () => {
     thumbSent.clear(); // renderer cache is fresh — resend all thumbs
     broadcast();
     // R146: 重启后回推持久化字号档，否则 line 端 Ctrl+滚轮只会读到默认 md。
@@ -1450,6 +1452,13 @@ async function exportMemoPng(id) {
     pressedID,
     userPinned,
   }));
+  // thumb 自愈：thumbSent 是「对 line 一次性」优化，但搜索/预览等任何窗口的
+  // 强制序列化都会把额度烧掉，renderer reload 的竞态也可能错过唯一一次发送。
+  // renderer 发现缺 thumb 时从这里拉，一行自愈，不再依赖广播时序。
+  ipcMain.handle('line:thumb', (_e, id) => {
+    const it = store.items.find(i => i.id === id);
+    return it && it.thumb ? it.thumb : null;
+  });
   // R92: renderer-side rope-zone hover. Complements the OS-cursor tracking:
   // on the mixed-DPI secondary display getCursorScreenPoint coords can
   // misalign with getBounds, retracting the line while a card is hovered.
