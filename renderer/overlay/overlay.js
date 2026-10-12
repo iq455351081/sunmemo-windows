@@ -388,7 +388,7 @@ heroCard.addEventListener('wheel', ev => {
   ev.preventDefault();
   // 触控板捏合手势在 Windows 上以 ctrl+wheel 形式到达 —— 与滚轮同路径，天然兼容（R78）
   // R68: zoom eases toward the target (inertia feel) instead of jumping
-  zoomTarget = Math.min(3, Math.max(1, zoomTarget + (ev.deltaY < 0 ? 0.2 : -0.2)));
+  zoomTarget = Math.min(5, Math.max(1, zoomTarget + (ev.deltaY < 0 ? 0.25 : -0.25)));
   const img = area.querySelector('img');
   if (!img) return;
   let reset = area.querySelector('.zoom-reset');
@@ -411,6 +411,47 @@ heroCard.addEventListener('wheel', ev => {
     if (Math.abs(zoomTarget - zoomCurrent) > 0.001) zoomRaf = requestAnimationFrame(approach);
   })();
 }, { passive: false });
+
+// R206+: 悬停自动放大（光标处放大镜 1.8x，设置可关）——滚轮仍可继续放大
+let imgZoomEnabled = true, hoverZoomActive = false;
+window.sun.invoke('settings:data').then(d => { imgZoomEnabled = d.settings.imgZoom !== false; }).catch(() => {});
+api.on('imgzoom', v => { imgZoomEnabled = !!v; });
+heroCard.addEventListener('mousemove', ev => {
+  if (!pv || pv.item.kind !== 'image' || !imgZoomEnabled) return;
+  const area = heroCard.querySelector('.photo-area');
+  const img = area && area.querySelector('img');
+  if (!img) return;
+  const r = img.getBoundingClientRect();
+  const nx = Math.min(Math.max((ev.clientX - r.left) / r.width, 0), 1);
+  const ny = Math.min(Math.max((ev.clientY - r.top) / r.height, 0), 1);
+  img.style.transformOrigin = (nx * 100).toFixed(1) + '% ' + (ny * 100).toFixed(1) + '%';
+  if (!hoverZoomActive && zoomTarget <= 1.001) {
+    hoverZoomActive = true;
+    zoomTarget = 2.2;
+    if (zoomRaf) cancelAnimationFrame(zoomRaf);
+    (function approach() {
+      zoomCurrent += (zoomTarget - zoomCurrent) * 0.22;
+      if (Math.abs(zoomTarget - zoomCurrent) < 0.005) zoomCurrent = zoomTarget;
+      applyPhotoTransform(img);
+      if (Math.abs(zoomTarget - zoomCurrent) > 0.001) zoomRaf = requestAnimationFrame(approach);
+    })();
+  }
+});
+heroCard.addEventListener('mouseleave', () => {
+  if (!hoverZoomActive) return;
+  hoverZoomActive = false;
+  zoomTarget = 1;
+  const area = heroCard.querySelector('.photo-area');
+  const img = area && area.querySelector('img');
+  if (!img) return;
+  if (zoomRaf) cancelAnimationFrame(zoomRaf);
+  (function approach() {
+    zoomCurrent += (zoomTarget - zoomCurrent) * 0.22;
+    if (Math.abs(zoomTarget - zoomCurrent) < 0.005) zoomCurrent = zoomTarget;
+    applyPhotoTransform(img);
+    if (Math.abs(zoomTarget - zoomCurrent) > 0.001) zoomRaf = requestAnimationFrame(approach);
+  })();
+});
 
 // R60: 点击标签 → 打开搜索并按该标签预筛选
 heroCard.addEventListener('click', ev => {
