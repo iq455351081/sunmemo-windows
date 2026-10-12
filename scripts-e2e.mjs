@@ -124,6 +124,40 @@ const run = async () => {
     if (!t2) await sleep(400);
   }
   ok('E2E-02 悬停扇面让位(目标卡抬起)', t2);
+
+  // ---- T02b 悬停图片卡 → 图片放大 1.35x（R206 悬停放大镜） ----
+  {
+    let zoomScale = null;
+    for (let i = 0; i < 3 && zoomScale === null; i++) {
+      await line.evalIn(`(() => {
+        const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip'));
+        if (!s) return false;
+        const f = s.querySelector('.photo-clip');
+        f.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        f.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+        return true;
+      })()`);
+      await sleep(500); // 320ms 弹簧过渡
+      zoomScale = await line.evalIn(`(() => {
+        const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip'));
+        if (!s || !s.classList.contains('hover')) return null;
+        const clip = s.querySelector('.photo-clip');
+        const m = getComputedStyle(clip).transform.split(String.fromCharCode(40))[1] && parseFloat(getComputedStyle(clip).transform.split(String.fromCharCode(40))[1]);
+        return m ? parseFloat(m[1]) : null;
+      })()`);
+      if (zoomScale === null) await sleep(400);
+    }
+    // 采样 3 次（320ms 过渡中读取可能取到中间态）
+    let diag = 'no-sample';
+    for (let k = 0; k < 3 && (zoomScale === null || zoomScale < 1.3); k++) {
+      await sleep(300);
+      zoomScale = await line.evalIn(`(() => { const s = [...document.querySelectorAll('.slot')].find(x => x.querySelector('.photo-clip')); const m = getComputedStyle(s.querySelector('.photo-clip')).transform.match(/matrix\(([-\d.]+)/); return m ? parseFloat(m[1]) : null; })()`).catch(() => null);
+      if (zoomScale !== null && zoomScale >= 1.3) diag = 'scale=' + zoomScale;
+    }
+    ok('E2E-26 悬停图片放大(1.35x)', zoomScale !== null && zoomScale >= 1.3, diag);
+    await line.evalIn(`document.body.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))`);
+    await sleep(400);
+  }
   await line.evalIn(`document.body.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))`);
   await sleep(400);
 
