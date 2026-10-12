@@ -325,6 +325,10 @@ body.sw #heroCard {
   #heroCard .act-btn.ghost { background: rgba(255, 255, 255, 0.10); }
 }
 body.sw #heroCard { background: rgba(252, 252, 252, 0.92); }
+/* R207: 图片预览不用白框——照片自带圆角阴影直接悬浮（Quick Look 式） */
+#heroCard.img-photo, body.sw #heroCard.img-photo { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; overflow: visible; }
+#heroCard.img-photo .photo-area { padding: 0; }
+#heroCard.img-photo .photo-area img { border-radius: 14px; box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45); width: 100%; height: 100%; object-fit: contain; }
 @media (prefers-color-scheme: dark) {
   body.sw #heroCard { background: rgba(250, 250, 250, 0.94); }
 }

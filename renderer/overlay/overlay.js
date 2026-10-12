@@ -36,7 +36,7 @@ function previewSize(item) {
     return { w: r.preview.w, h: r.preview.h, body: r.previewBody };
   }
   const iw = item.thumbW || 480, ih = item.thumbH || 320;
-  const maxW = 620, maxH = 420;
+  const maxW = Math.min(1100, Math.round(innerWidth * 0.62)), maxH = Math.min(700, Math.round(innerHeight * 0.64));
   const s = Math.min(maxW / iw, maxH / ih, 1.4);
   return { w: Math.max(320, iw * s), h: Math.max(220, ih * s) + 150, body: 0 };
 }
@@ -144,6 +144,8 @@ function showPreview(payload) {
 
 function renderHero(item) {
   pv.item = item;
+  // R207: 图片预览用无边框悬浮样式（Quick Look 式，无白框）
+  heroCard.classList.toggle('img-photo', item.kind === 'image');
   const size = previewSize(item);
   // 重置真正的缩放状态（photoZoom 是死变量）：放大后切下一张，滚轮第一下
   // 不再从旧倍率猛跳。zoomTarget/zoomCurrent 声明在下方，运行时已求值。
