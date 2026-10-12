@@ -51,6 +51,7 @@ api.invoke('settings:data').then(d => {
   customDot = pick;
   themeRow.appendChild(pick);
   document.getElementById('chkSound').checked = d.settings.soundOn;
+  document.getElementById('chkImgZoom').checked = d.settings.imgZoom !== false;
   document.getElementById('chkPower').checked = !!d.settings.powerSave;
   document.getElementById('chkWind').checked = !!d.settings.wind;
   document.getElementById('chkGpu').checked = d.settings.gpuSoftware !== true;
@@ -135,6 +136,7 @@ window.addEventListener('keydown', ev => {
 
 document.getElementById('chkAutoHang').addEventListener('change', e => api.send('settings:set', { key: 'autoHang', value: e.target.checked }));
 document.getElementById('chkSound').addEventListener('change', e => api.send('settings:set', { key: 'soundOn', value: e.target.checked }));
+document.getElementById('chkImgZoom').addEventListener('change', e => api.send('settings:set', { key: 'imgZoom', value: e.target.checked }));
 document.getElementById('chkPower').addEventListener('change', e => api.send('settings:set', { key: 'powerSave', value: e.target.checked }));
 document.getElementById('chkWind').addEventListener('change', e => api.send('settings:set', { key: 'wind', value: e.target.checked }));
 document.getElementById('resetAppearance').addEventListener('click', () => {

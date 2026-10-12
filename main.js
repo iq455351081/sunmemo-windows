@@ -273,6 +273,7 @@ app.whenReady().then(async () => {
     broadcast();
     // R146: 重启后回推持久化字号档，否则 line 端 Ctrl+滚轮只会读到默认 md。
     try { lineWin.webContents.executeJavaScript(`document.body.dataset.font = '${store.settings.cardFont || 'md'}'`).catch(() => {}); } catch { /* ignore */ }
+    try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('imgzoom', ${store.settings.imgZoom !== false})`).catch(() => {}); } catch { /* ignore */ }
     if (!store.settings.welcomed && !isShots) {
       setTimeout(() => showWelcome(), 1200);
     }
@@ -856,6 +857,8 @@ function showPreview(id) {
   const d = lastLineDisplay || screen.getPrimaryDisplay();
   if (!overlayWin || overlayWin.isDestroyed()) return; // R103 guard
   previewOpen = true;
+  // R206+: 点击展开时，绳上悬停态（含图片自动放大）立即清除——同一时刻只呈现一个
+  try { lineWin.webContents.send('line:cool'); } catch { /* ignore */ }
   overlayFit = { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height };
   overlayWin.setBounds(overlayFit);
   overlayWin.show();
@@ -1175,6 +1178,9 @@ function setSetting(key, value) {
     try { lineWin.webContents.executeJavaScript(`document.body.dataset.font = '${value}'`).catch(() => {}); } catch { /* ignore */ }
   }
   if (key === 'autoHang') watchers.autoHang = value;
+  if (key === 'imgZoom') {
+    try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('imgzoom', ${!!value})`).catch(() => {}); } catch { /* ignore */ }
+  }
   if (key === 'compact') {
     try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('compact', ${!!value})`).catch(() => {}); } catch { /* ignore */ }
   }

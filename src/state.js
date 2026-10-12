@@ -32,6 +32,7 @@ class LineStore {
       hangNotify: false,
       beacon: true,
       autoHang: false,
+      imgZoom: true, // R206+: 悬停图片自动放大（苹果式弹簧缩放，可在设置关闭）
       autoUpdate: true,
       welcomed: false,
       inboxOffered: false,

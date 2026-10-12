@@ -505,7 +505,13 @@ function reportHitRects() {
 
 function setHoveredSlot(id) {
   if (id === hoveredId) return;
+  // R206b: 把 .hover 类真正落到槽位元素上——此前 hoveredId 只进 JS 状态，
+  // CSS 里 15 条 .slot.hover 规则（工具条/阴影/图片放大）从未命中过。
+  const prev = hoveredId && slots.get(hoveredId);
+  if (prev && prev.el) prev.el.classList.remove('hover');
   hoveredId = id || null;
+  const next = id && slots.get(id);
+  if (next && next.el) next.el.classList.add('hover');
   applyPeek();
 }
 cardsEl.addEventListener('mouseover', ev => {
