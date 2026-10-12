@@ -91,7 +91,8 @@ html, body {
   -webkit-backdrop-filter: blur(16px) saturate(170%);
   background: rgba(252, 252, 252, 0.35);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+  /* R207: overflow visible——悬停放大镜需要自由溢出面板（裁剪曾把放大图框死） */
+  overflow: visible;
 }
 body.sw #heroCard {
   backdrop-filter: none;
@@ -236,7 +237,7 @@ body.sw #heroCard {
 #heroCard code { background: rgba(0, 0, 0, 0.07); border-radius: 4px; padding: 0 4px; font-family: Consolas, monospace; font-size: 0.9em; }
 
 /* photo hero */
-.photo-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 4px 12px; min-height: 0; overflow: auto; }
+.photo-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 4px 12px; min-height: 0; overflow: visible; } /* R207: 悬停放大需自由溢出 */
 .photo-area img {
   max-width: 100%; max-height: 100%;
   border-radius: 12px;
