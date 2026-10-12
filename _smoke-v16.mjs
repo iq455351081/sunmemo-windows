@@ -32,7 +32,7 @@ if (!revealed) { await line.ev(`window.sun.send('line:toggle-userpin')`); await 
 const before = await line.ev(`document.querySelectorAll('.slot[data-id]').length`);
 await line.ev(`window.sun.send('line:drop-file', ${JSON.stringify(DOCS + E + '项目方案.md')})`);
 await sleep(900);
-const doc1 = await line.ev(`(() => { const c = document.querySelector('.card.doc'); if (!c) return null; return { name: c.querySelector('.doc-name') && c.querySelector('.doc-name').textContent, chip: c.querySelector('.doc-chip') && c.querySelector('.doc-chip').textContent }; })()`);
+const doc1 = await line.ev(`(() => { const n = [...document.querySelectorAll('.doc-name')].find(n => n.textContent === '项目方案.md'); if (!n) return null; const c = n.closest('.card'); return { name: n.textContent, chip: c.querySelector('.doc-chip') && c.querySelector('.doc-chip').textContent }; })()`);
 chk('md 上绳成文档卡', !!doc1 && doc1.name === '项目方案.md' && doc1.chip === 'MD', JSON.stringify(doc1));
 await line.ev(`window.sun.send('line:drop-file', ${JSON.stringify(DOCS + E + '设计说明.pdf')})`);
 await line.ev(`window.sun.send('line:drop-file', ${JSON.stringify(DOCS + E + '会议纪要.docx')})`);

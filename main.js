@@ -628,10 +628,20 @@ function tickInner() {
 
   // The line's zone runs from its lowest point up to the top of the screen.
   const lb = lineBounds || lineWin.getBounds();
-  const inside = (p.x >= lb.x && p.x <= lb.x + lb.width && p.y >= d.bounds.y && p.y <= lb.y + lb.height) || rendererHot;
+  const geomInside = p.x >= lb.x && p.x <= lb.x + lb.width && p.y >= d.bounds.y && p.y <= lb.y + lb.height;
+  // v1.6 修复"有时不收回"：rendererHot（renderer 悬停热区）在覆盖窗出现、
+  // mouseleave 丢失时会永久卡 true。光标远离绳带 140px 即不再采信。
+  if (rendererHot && !geomInside) {
+    const near = p.x >= lb.x - 140 && p.x <= lb.x + lb.width + 140 &&
+                 p.y >= d.bounds.y - 40 && p.y <= lb.y + lb.height + 140;
+    if (!near) rendererHot = false;
+  }
+  const inside = geomInside || rendererHot;
   if (inside && pinned && !previewOpen) pinned = false;
 
-  const busy = pinned || userPinned || draggingID != null || pressedID != null || previewOpen || docPeekOpen || now < peekUntil;
+  // v1.6 修复"移走鼠标绳不收回"：pinned 不再计入 busy——移开 500ms 即收回
+  // 并清除临时钉住；鼠标在绳带内则不受影响。
+  const busy = userPinned || draggingID != null || pressedID != null || previewOpen || docPeekOpen || now < peekUntil;
   if (inside || busy) {
     awaySince = 0;
   } else {
@@ -639,6 +649,7 @@ function tickInner() {
     awaySince = since;
     if (now - since >= RETRACT_DELAY) {
       awaySince = 0;
+      pinned = false;
       setRevealed(false);
     }
   }
@@ -705,7 +716,10 @@ function hangMemoFlight(memoData, fromRect) {
   wanted = true;
   placeOnDisplay();
   refresh();
-  reveal({ pinned: true });
+  // v1.6 修复"移走鼠标绳不收回"：pinned 只在光标重新进入绳带时才清除，
+  // 提交后鼠标若不经过绳带就永久卡住。改用 2.5s 宽限 peek——看得到落绳，
+  // 且无论如何都会自动收回；鼠标进入绳带则宽限自然续期。
+  reveal({ peekFor: 2.5 });
 
   const id = store.addMemo({ ...memoData, flying: true });
   if (id == null) return;
