@@ -23,4 +23,33 @@ document.getElementById('beacon').addEventListener('mouseenter', () => {
 });
 document.getElementById('beacon').addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 
+// ---- v1.6 文档/图片拖到信标太阳上 = 直接挂绳（绳收起时的投递口） ------------
+// 必须 preventDefault，否则 Electron 默认行为是整窗导航到被拖文件（信标报废）。
+const pill = document.getElementById('beacon');
+document.addEventListener('dragover', ev => {
+  ev.preventDefault();
+  if (ev.dataTransfer) {
+    ev.dataTransfer.dropEffect = 'copy';
+    ev.dataTransfer.effectAllowed = 'copy';
+  }
+  pill.classList.add('dropping');
+  if (pill.querySelector('.label')) pill.querySelector('.label').textContent = '松手挂到绳上';
+});
+document.addEventListener('dragleave', ev => {
+  if (!ev.relatedTarget) {
+    pill.classList.remove('dropping');
+    const l = pill.querySelector('.label');
+    if (l) l.textContent = '晾衣绳';
+  }
+});
+document.addEventListener('drop', ev => {
+  ev.preventDefault();
+  pill.classList.remove('dropping');
+  const l = pill.querySelector('.label');
+  if (l) l.textContent = '晾衣绳';
+  const files = [...(ev.dataTransfer ? ev.dataTransfer.files : [])];
+  const paths = files.map(f => { try { return api.getPathForFile(f); } catch { return null; } }).filter(Boolean);
+  if (paths.length) api.send('beacon:drop-files', paths);
+});
+
 // beacon visibility is managed by the main process (show/hide of this window)

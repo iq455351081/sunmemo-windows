@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { LineStore } = require('./src/state');
 const { Sync, calculateTodoStats } = require('./src/sync');
+const { docTypeOf } = require('./src/state');
 const { Watchers } = require('./src/watchers');
 const { ensureAssets } = require('./src/icon');
 const { renderMemoPng } = require('./src/memo-png');
@@ -381,11 +382,10 @@ function createBeaconWindow() {
   const d = screen.getPrimaryDisplay();
   const wa = d.workArea;
   beaconWin = new BrowserWindow({
-    // 80x42 = 64x26 pill + 8px transparent hit ring per side — the ring's
-    // faint-alpha pixels live in this window (fully transparent ones are
-    // click-through on Windows, so the ring must have real pixels here).
-    x: Math.round(wa.x + wa.width / 2 - 40), y: wa.y,
-    width: 80, height: 42,
+    // 168x42 = 26px pill + hover 展开到 118px 也要完整落在窗口内（此前 80 宽
+    // 会把展开的胶囊裁成黑条——用户截图的"怪形状"根因），8px 透明命中环同理。
+    x: Math.round(wa.x + wa.width / 2 - 84), y: wa.y,
+    width: 168, height: 42,
     frame: false, transparent: true, resizable: false,
     skipTaskbar: true, hasShadow: false,
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false },
@@ -404,7 +404,7 @@ function updateBeacon() {
       // the secondary, the beacon waits THERE, not back on the primary.
       const dd = lastLineDisplay || screen.getPrimaryDisplay();
       const wa = dd.workArea;
-      beaconWin.setBounds({ x: Math.round(wa.x + wa.width / 2 - 40), y: wa.y, width: 80, height: 42 });
+      beaconWin.setBounds({ x: Math.round(wa.x + wa.width / 2 - 84), y: wa.y, width: 168, height: 42 });
     } catch { /* keep */ }
     // show() (not showInactive): hidden transparent windows re-shown with
     // showInactive sometimes never reach the screen on Windows — the OS hit
@@ -560,6 +560,7 @@ function stopMouseTracking() {
 }
 
 let cursorWasInside = false;
+let lineScrollX = 0; // 晾衣绳横向滚动偏移（renderer 上报，飞行/预览落点用）
 let rendererHot = false; // R92: renderer-reported rope-zone hover
 let slowTicks = 0;       // [perf] consecutive away-and-tucked ticks before halving the poll rate
 let __tickMs = 0, __tickN = 0, __tickPart = '';
@@ -630,7 +631,7 @@ function tickInner() {
   const inside = (p.x >= lb.x && p.x <= lb.x + lb.width && p.y >= d.bounds.y && p.y <= lb.y + lb.height) || rendererHot;
   if (inside && pinned && !previewOpen) pinned = false;
 
-  const busy = pinned || userPinned || draggingID != null || pressedID != null || previewOpen || now < peekUntil;
+  const busy = pinned || userPinned || draggingID != null || pressedID != null || previewOpen || docPeekOpen || now < peekUntil;
   if (inside || busy) {
     awaySince = 0;
   } else {
@@ -662,7 +663,9 @@ function cardFrameFor(id) {
   if (idx < 0 || !lineBounds) return null;
   const item = store.items[idx];
   const count = store.items.length + 1; // the add-card sits at the end
-  return L.cardFrame(item, idx, count, lineBounds.x, lineBounds.y, lineBounds.width);
+  const f = L.cardFrame(item, idx, count, lineBounds.x, lineBounds.y, lineBounds.width);
+  if (lineScrollX) { f.x += lineScrollX; f.cx += lineScrollX; } // 绳上平移后的落点修正
+  return f;
 }
 
 function hangCapture(file, { flying = false } = {}) {
@@ -851,6 +854,7 @@ function showPreview(id) {
   previewCurrentId = id;
   const to = cardFrameFor(id);
   if (!to) return;
+  closeDocPeek(); // 弹出阅读若开着，先收（overlay 只呈现一个面板）
   // R101: ALWAYS fullscreen on the rope's display. The old "fit the overlay
   // around the card" math raced the fullscreen flight/fall paths under
   // mixed-DPI — setBounds DIP rects got rescaled across monitors and the
@@ -872,6 +876,53 @@ function showPreview(id) {
     origin: previewOrigin,
     display: { x: 0, y: 0, width: overlayFit.width, height: overlayFit.height },
   });
+}
+
+// v1.6 文档卡悬停弹出阅读（Quick Look popover）：overlay 全屏窗承载 420×600
+// 阅读面板，锚定卡片上方（底边压住卡顶，光标保持在面板内避免闪烁回环）。
+let docPeekOpen = false, docPeekSince = 0;
+ipcMain.on('line:doc-peek', (_e, { id }) => {
+  const item = store.find(id);
+  if (!item || item.kind !== 'doc' || item.falling || previewOpen) return;
+  showDocPeek(item);
+});
+ipcMain.on('line:doc-peek-close', (_e, p) => {
+  // 面板弹出瞬间的边缘 mouseleave 不算离开（光标从卡移入面板的过渡）
+  if (p && p.reason === 'hover' && Date.now() - docPeekSince < 450) return;
+  closeDocPeek();
+});
+function showDocPeek(item) {
+  const f = cardFrameFor(item.id);
+  if (!f || !overlayWin || overlayWin.isDestroyed()) return;
+  const d = lastLineDisplay || screen.getDisplayNearestPoint({ x: Math.round(f.x + f.w / 2), y: Math.round(f.y) });
+  const wa = d.workArea;
+  // 用户要求：面板放桌面正中，且不与绳上任何东西重叠——垂直居中于绳带下方的自由区
+  const stripBottom = wa.y + L.PANEL_H + 18;
+  const PW = Math.min(470, Math.round(wa.width * 0.32));
+  const freeH = wa.height - (stripBottom - wa.y);
+  const PH = Math.min(620, freeH - 24);
+  if (PH < 260) return; // 屏幕太矮放不下阅读面板
+  const px = Math.round(wa.x + (wa.width - PW) / 2);
+  const py = Math.round(stripBottom + (freeH - PH) / 2);
+  docPeekOpen = true;
+  docPeekSince = Date.now();
+  try { lineWin.webContents.send('line:cool'); } catch { /* ignore */ }
+  overlayFit = { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height };
+  overlayWin.setBounds(overlayFit);
+  if (!overlayWin.isVisible()) overlayWin.showInactive();
+  overlayWin.webContents.send('show-doc-peek', {
+    item: serializeItem(item, true),
+    panel: { x: px - wa.x, y: py - wa.y, w: PW, h: PH },
+    anchor: { x: f.x - wa.x, y: f.y - wa.y, w: f.w, h: f.h }, // 光标停在源卡片上也保持打开
+  });
+}
+function closeDocPeek() {
+  if (!docPeekOpen) return;
+  docPeekOpen = false;
+  if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('doc-peek-close');
+  setTimeout(() => {
+    if (!docPeekOpen && !previewOpen && overlayWin && !overlayWin.isDestroyed() && overlayWin.isVisible()) overlayWin.hide();
+  }, 260);
 }
 
 function closePreview() {
@@ -959,7 +1010,8 @@ function showWelcome() {
   if (previewOpen) closePreview(); // R166b: overlay would swallow clicks
   if (welcomeWin && !welcomeWin.isDestroyed()) { welcomeWin.show(); welcomeWin.focus(); return; }
   welcomeWin = new BrowserWindow({
-    width: 440, height: 600, show: false, frame: false, transparent: true,
+    // 740 高：特性清单增至 5 条后卡片更高，600 会把底部按钮裁掉半截
+    width: 440, height: 740, show: false, frame: false, transparent: true,
     resizable: false, skipTaskbar: true, hasShadow: false,
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false },
   });
@@ -1299,9 +1351,12 @@ function serializeItem(item, forceThumb = false) {
   if (item.thumb != null) thumbSent.add(item.id);
   return {
     id: item.id, kind: item.kind, tilt: item.tilt,
+    url: item.url, // 文档阅读器/回收站等按原路径读文件（fileUrl 只是展示用别名）
     thumb: sendThumb ? item.thumb : null,
     thumbW: item.thumbW, thumbH: item.thumbH,
     memo: item.memo ? { ...item.memo } : null,
+    docType: item.docType || null, docName: item.docName || '',
+    docSize: item.docSize || 0, docMtime: item.docMtime || 0,
     flying: !!item.flying, falling: !!item.falling,
     desktop: item.desktop ? { ...item.desktop } : null,
     fileUrl: 'file://' + item.url.replace(/\\/g, '/'),
@@ -1459,6 +1514,31 @@ async function exportMemoPng(id) {
     const it = store.items.find(i => i.id === id);
     return it && it.thumb ? it.thumb : null;
   });
+  // 文档卡内容读取（悬停阅读/预览/速记窗拖入共用）。文本 8MB 封顶、二进制
+  // 64MB 封顶——悬停阅读是速览，超大文件走系统应用。
+  ipcMain.handle('doc:load-text', async (_e, file) => {
+    try {
+      const st = await fs.promises.stat(file);
+      if (st.size > 8 * 1024 * 1024) return { ok: false, err: '文件超过 8MB，请用系统应用打开' };
+      return { ok: true, text: await fs.promises.readFile(file, 'utf8') };
+    } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+  });
+  ipcMain.handle('doc:load', async (_e, file) => {
+    try {
+      const st = await fs.promises.stat(file);
+      if (st.size > 64 * 1024 * 1024) return { ok: false, err: '文件超过 64MB，请用系统应用打开' };
+      return { ok: true, buf: await fs.promises.readFile(file) };
+    } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+  });
+  // 文档阅读器内的 http(s) 链接 → 系统浏览器（只放行这两种协议）
+  ipcMain.on('doc:open-external', (_e, url) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      require('electron').shell.openExternal(url).catch(() => {});
+    }
+  });
+  // 晾衣绳滚动偏移：renderer 拖拽/滚轮平移后上报，cardFrameFor 用它修正
+  // 飞行落点/预览定位的屏幕坐标（绳不动、卡片沿绳滑）。
+  ipcMain.on('line:scroll', (_e, x) => { lineScrollX = Number(x) || 0; });
   // R92: renderer-side rope-zone hover. Complements the OS-cursor tracking:
   // on the mixed-DPI secondary display getCursorScreenPoint coords can
   // misalign with getBounds, retracting the line while a card is hovered.
@@ -1469,15 +1549,18 @@ async function exportMemoPng(id) {
     updateBeacon();
     broadcast();
   });
-  // R94: files dropped onto the rope. Images hang as photo cards; .txt/.md
-  // become text memos — store.hang() rejects anything else gracefully.
+  // R94: files dropped onto the rope. Images hang as photo cards; md/txt/pdf/
+  // docx/ppt/xls hang as document cards (v1.6). store.hang() rejects anything
+  // else gracefully.
   ipcMain.on('line:drop-file', (_e, file) => {
     if (!file) return;
-    if (/\.(txt|md)$/i.test(file)) {
-      try {
-        const text = fs.readFileSync(file, 'utf8');
-        if (text.trim()) { store.addMemo({ text: text.slice(0, 2000), color: 'yellow' }); return; }
-      } catch { /* not readable — fall through to hangCapture */ }
+    if (docTypeOf(file)) {
+      const before = store.liveCount();
+      hangCapture(file, { flying: false });
+      if (store.liveCount() > before) return;
+      store.play('beep', 0.4);
+      lineWin && !lineWin.isDestroyed() && lineWin.webContents.send('hint-toast', '文档打不开（可能已被移动或删除）');
+      return;
     }
     // hangCapture has no return value — compare liveCount before/after as the
     // success signal. A drop that hangs nothing must not vanish silently.
@@ -1485,7 +1568,26 @@ async function exportMemoPng(id) {
     hangCapture(file, { flying: false });
     if (store.liveCount() === before) {
       store.play('beep', 0.4);
-      lineWin && !lineWin.isDestroyed() && lineWin.webContents.send('hint-toast', '暂不支持该类型的文件（支持图片 / .txt / .md）');
+      lineWin && !lineWin.isDestroyed() && lineWin.webContents.send('hint-toast', '暂不支持该类型的文件（支持图片与常见文档）');
+    }
+  });
+  // v1.6 拖到信标太阳上 = 直接挂绳（绳收起时的投递口）；成功即展开绳看新卡
+  ipcMain.on('beacon:drop-files', (_e, files) => {
+    if (!Array.isArray(files) || !files.length) return;
+    let hung = 0;
+    for (const file of files) {
+      if (!file || typeof file !== 'string') continue;
+      const before = store.liveCount();
+      hangCapture(file, { flying: false });
+      if (store.liveCount() > before) hung++;
+    }
+    if (hung > 0) {
+      revealLinePinned();
+      if (tray && tray.displayBalloon) {
+        try { tray.displayBalloon({ title: '已挂上晾衣绳', content: '拖入了 ' + hung + ' 个文件', icon: assets.icon32 }); } catch { /* ignore */ }
+      }
+    } else {
+      store.play('beep', 0.4);
     }
   });
   ipcMain.on('line:toggle-pinned', (_e, id) => store.toggleMemoPinned(id));

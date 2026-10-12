@@ -311,3 +311,16 @@ body.in #sheet { opacity: 1; transform: none; }
   ::-webkit-scrollbar-thumb { background: rgba(200, 200, 210, 0.26); background-clip: padding-box; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(200, 200, 210, 0.45); background-clip: padding-box; }
 }
+
+/* ---- v1.6 拖文本/文件进速记窗 → 直接粘内容 -------------------------------- */
+#sheet.dropping { outline: 2px dashed rgba(255,143,31,0.75); outline-offset: -7px; }
+.drop-chip {
+  position: fixed; left: 50%; bottom: 16px; z-index: 999;
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(42,40,36,0.94); color: #fff;
+  font-size: 12px; padding: 7px 15px; border-radius: 999px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.drop-chip.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.drop-chip.warn { background: rgba(176,58,46,0.95); }

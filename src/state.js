@@ -7,11 +7,22 @@ const path = require('path');
 const { nativeImage } = require('electron');
 const { uuid, calculateTodoStats, toggleTodoLine } = require('./sync');
 
+// 挂绳文档类型 → 卡片 docType。md/txt 全文内读；pdf 走 PDF.js；docx 走
+// docx-preview；ppt/xls 等无可靠轻量渲染器 → 精致类型板式卡（悬停信息面板）。
+const DOC_TYPES = {
+  md: 'md', markdown: 'md', txt: 'txt', log: 'txt', csv: 'txt',
+  pdf: 'pdf', docx: 'docx', doc: 'doc', pptx: 'ppt', ppt: 'ppt', xlsx: 'xls', xls: 'xls',
+};
+function docTypeOf(file) {
+  const m = /\.(md|markdown|txt|log|csv|pdf|docx|doc|pptx|ppt|xlsx|xls)$/i.exec(file);
+  return m ? DOC_TYPES[m[1].toLowerCase()] : null;
+}
+
 class LineStore {
   constructor({ memosFolder, configPath }) {
     this.memosFolder = memosFolder;
     this.configPath = configPath;
-    this.items = [];            // { id, kind:'memo'|'image', url, tilt, flying, falling, memo:{text,color,isDone,createdAt,aspectRatio}, thumb, thumbW, thumbH }
+    this.items = [];            // { id, kind:'memo'|'image'|'doc', url, tilt, flying, falling, memo:{...}, thumb, thumbW, thumbH, docType, docName, docSize, docMtime }
     this.maxItems = 35;
     this.onFall = null;         // (item) => void  (falling animation hook)
     this.onChange = null;       // () => void     (broadcast hook)
@@ -208,6 +219,19 @@ class LineStore {
           },
         };
       } catch { return null; }
+    } else if (docTypeOf(url)) {
+      // 文档卡：不拷贝不改动，原文件挂在原位，绳只是视图。
+      let st = null;
+      try { st = fs.statSync(url); } catch { return null; }
+      item = {
+        id: uuid(), kind: 'doc', url,
+        tilt: this.tilts[url] != null ? clampTilt(this.tilts[url]) : rand(-2.5, 2.5),
+        flying, falling: false,
+        docType: docTypeOf(url),
+        docName: path.basename(url),
+        docSize: st.size,
+        docMtime: st.mtimeMs,
+      };
     } else {
       const thumb = this.makeThumb(url);
       if (!thumb) return null;
@@ -408,6 +432,8 @@ class LineStore {
     this.isInternalCopy = true;
     if (item.kind === 'memo') {
       clipboard.writeText(item.memo.text);
+    } else if (item.kind === 'doc') {
+      clipboard.writeText(item.url); // 文档卡复制的是文件路径，内容可从卡里看
     } else {
       clipboard.writeImage(nativeImage.createFromPath(item.url));
     }
@@ -490,4 +516,4 @@ async function shell_trash(file) {
   try { fs.rmSync(file, { force: true }); return true; } catch { return false; }
 }
 
-module.exports = { LineStore, calculateTodoStats };
+module.exports = { LineStore, calculateTodoStats, docTypeOf, DOC_TYPES };

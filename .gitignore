@@ -9,3 +9,6 @@ _shots/mem-baseline.json
 *.log
 config.json.bak
 .spec-workflow/
+_docs/
+_shots/
+_e2e-result.json

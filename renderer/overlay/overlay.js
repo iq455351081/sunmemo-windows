@@ -35,6 +35,10 @@ function previewSize(item) {
     const r = L.RATIOS[(item.memo && item.memo.aspectRatio) || 'wide'] || L.RATIOS.wide;
     return { w: r.preview.w, h: r.preview.h, body: r.previewBody };
   }
+  if (item.kind === 'doc') {
+    // 文档大图阅读：宽版纸面 + 头尾操作条
+    return { w: Math.min(820, Math.round(innerWidth * 0.62)), h: Math.min(720, Math.round(innerHeight * 0.72)), body: 0, doc: true };
+  }
   const iw = item.thumbW || 480, ih = item.thumbH || 320;
   const maxW = Math.min(1100, Math.round(innerWidth * 0.62)), maxH = Math.min(700, Math.round(innerHeight * 0.64));
   const s = Math.min(maxW / iw, maxH / ih, 1.4);
@@ -73,8 +77,31 @@ function heroHTML(item) {
       </div>`;
   }
   const size = previewSize(item);
+  if (item.kind === 'doc') {
+    const m = window.DOCR.meta(item.docType);
+    return `
+    <div class="hero-inner hero-doc" style="width:${size.w}px;height:${size.h}px">
+      <div class="hero-head">
+        <span class="doc-chip" style="background:${m.c1}">${m.label}</span>
+        <span class="name-pill plain" title="${window.escapeHtml(item.docName || '')}"><span>${window.escapeHtml(item.docName || '')}</span></span>
+        <span class="hero-spacer"></span>
+        <span class="hero-time">${window.DOCR.sizeText(item.docSize)}${item.docMtime ? ' · ' + window.DOCR.mtimeText(item.docMtime) : ''}</span>
+        <button class="close-x" data-act="close">${ICONS.x}</button>
+      </div>
+      <div class="hero-doc-host"></div>
+      <div class="hero-foot">
+        <div class="hero-actions">
+          <span class="hero-hint grow">滚轮翻阅 · 拖选可复制</span>
+          <button class="act-btn ghost" data-act="reveal">打开文件夹</button>
+          <button class="act-btn primary" data-act="open">用系统应用打开</button>
+          <button class="act-btn danger" data-act="trash">${ICONS.trash}<span>移到回收站</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  const size2 = previewSize(item);
   return `
-    <div class="hero-inner" style="width:${size.w}px;height:${size.h}px">
+    <div class="hero-inner" style="width:${size2.w}px;height:${size2.h}px">
       <div class="hero-head">
         <span class="name-pill" data-act="open" role="button" title="打开图片">${ICONS.open}<span>${fileName(item.fileUrl)}</span></span>
         <span class="hero-spacer"></span>
@@ -142,6 +169,8 @@ function showPreview(payload) {
   requestAnimationFrame(() => animatePreview(0, 1, 620));
 }
 
+let heroDocDispose = null; // 当前文档阅读器的 dispose（切页/关闭时取消在途渲染）
+
 function renderHero(item) {
   pv.item = item;
   // R207: 图片预览用无边框悬浮样式（Quick Look 式，无白框）
@@ -166,6 +195,16 @@ function renderHero(item) {
   });
   const body = heroCard.querySelector('.hero-body');
   if (body && item.kind === 'memo') body.style.height = size.body + 'px';
+  // v1.6 文档预览：大阅读面（与悬停弹出同一渲染器，页数放宽到 8）
+  const docHost = heroCard.querySelector('.hero-doc-host');
+  if (docHost && item.kind === 'doc') {
+    if (heroDocDispose) { heroDocDispose(); heroDocDispose = null; }
+    window.DOCR.buildReader(item, { width: size.w - 36, pdfPages: 8 }).then(({ el, dispose }) => {
+      if (!docHost.isConnected) { dispose(); return; }
+      docHost.appendChild(el);
+      heroDocDispose = dispose;
+    }).catch(() => {});
+  }
 }
 
 function cardTopPoint() {
@@ -253,6 +292,7 @@ function dismissPreview(instant = false) {
   const hide = () => {
     if (!pv) return; // 幂等：210ms 内 Esc 等二次 dismiss 不会重复发 overlay:close
     pv = null;
+    if (heroDocDispose) { heroDocDispose(); heroDocDispose = null; }
     heroWrap.classList.add('hidden');
     pegEl.classList.add('hidden');
     cordSvg.style.opacity = 0;
@@ -317,7 +357,12 @@ heroCard.addEventListener('click', ev => {
     flashBtn(act, photoRotation + '°');
   }
   else if (a === 'tag') { /* handled via chip listener below */ }
-  else if (a === 'open') { flashBtn(act, '打开中…'); api.send('line:open', pv.item.id); }
+  else if (a === 'open') {
+    flashBtn(act, '打开中…');
+    api.send('line:open', pv.item.id);
+    // 文档交给系统应用后预览立即收起——别让全屏预览盖住刚打开的文档
+    if (pv.item.kind === 'doc') dismissPreview();
+  }
   else if (a === 'reveal') { flashBtn(act, '打开文件夹…'); api.send('line:reveal', pv.item.id); }
   else if (a === 'inline' && pv.item.kind === 'memo') startInlineEdit();
 });
@@ -545,3 +590,89 @@ function escapeHtml(s) {
 
 api.on('show-preview', showPreview);
 api.send('overlay:ready');
+
+// ---- v1.6 文档悬停弹出阅读（line 悬停文档卡 320ms 后由主进程锚位弹出） ------
+let peekEl = null, peekDispose = null, peekItem = null, peekToken = 0;
+
+api.on('show-doc-peek', async ({ item, panel }) => {
+  const token = ++peekToken;
+  peekItem = item;
+  hideDocPeek(true);
+  // 保险：清掉一切游离的旧面板（异步竞态下 peekEl 引用可能已漂移）
+  document.querySelectorAll('.doc-peek').forEach(n => n.remove());
+  peekEl = document.createElement('div');
+  peekEl.className = 'doc-peek';
+  peekEl.style.left = panel.x + 'px';
+  peekEl.style.top = panel.y + 'px';
+  peekEl.style.width = panel.w + 'px';
+  peekEl.style.height = panel.h + 'px';
+  peekEl.innerHTML =
+    '<div class="doc-peek-host"></div>' +
+    '<div class="doc-peek-bar">' +
+    '<span class="doc-peek-hint">粘性阅读 · 点面板外或按 Esc 关闭</span>' +
+    '<span class="peek-spacer"></span>' +
+    '<button class="peek-btn" data-pk="preview" role="button">大图阅读</button>' +
+    '<button class="peek-btn primary" data-pk="open" role="button">打开文档</button>' +
+    '<button class="peek-x" data-pk="close" role="button" aria-label="关闭阅读">' +
+    '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>' +
+    '</button>' +
+    '</div>';
+  document.body.appendChild(peekEl);
+  requestAnimationFrame(() => peekEl && peekEl.classList.add('in'));
+  // 粘性：鼠标移出不关闭。关闭 = Esc / 点面板外 / ✕ / 大图 / 打开
+  peekEl.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-pk]');
+    if (!b) return;
+    if (b.dataset.pk === 'open') {
+      api.send('line:open', item.id);
+      hideDocPeek();
+      api.send('line:doc-peek-close', { reason: 'open' });
+    } else if (b.dataset.pk === 'close') {
+      hideDocPeek();
+      api.send('line:doc-peek-close', { reason: 'x' });
+    } else {
+      // 大图阅读：关掉弹出，走完整预览（同一条 line:open-preview 链路）
+      const id = item.id;
+      hideDocPeek();
+      api.send('line:doc-peek-close', { reason: 'preview' });
+      api.send('line:open-preview', id);
+    }
+  });
+  const host = peekEl.querySelector('.doc-peek-host');
+  try {
+    const { el, dispose } = await window.DOCR.buildReader(item, { width: panel.w - 26, pdfPages: 5 });
+    if (token !== peekToken || !peekEl || !host.isConnected) { dispose(); return; }
+    host.appendChild(el);
+    peekDispose = dispose;
+  } catch { /* buildReader 内部已渲染错误态 */ }
+});
+
+// 点面板外 = 关闭（粘性阅读的唯一点击出口；滚绳/Esc/✕ 亦然）
+document.addEventListener('mousedown', ev => {
+  if (!peekEl) return;
+  if (peekEl.contains(ev.target)) return;
+  hideDocPeek();
+  api.send('line:doc-peek-close', { reason: 'outside' });
+}, true);
+
+api.on('doc-peek-close', () => hideDocPeek());
+
+function hideDocPeek(quick) {
+  if (peekDispose) { peekDispose(); peekDispose = null; }
+  if (!peekEl) return;
+  const el = peekEl;
+  peekEl = null;
+  peekItem = null;
+  if (quick) { el.remove(); return; }
+  el.classList.remove('in');
+  setTimeout(() => el.remove(), 180);
+}
+
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && peekEl) {
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+    hideDocPeek();
+    api.send('line:doc-peek-close', { reason: 'esc' });
+  }
+}, true);

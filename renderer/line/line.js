@@ -4,7 +4,6 @@ const api = window.sun;
 const stage = document.getElementById('stage');
 const ropeEl = document.getElementById('rope');
 const cardsEl = document.getElementById('cards');
-const hintEl = document.getElementById('hint');
 const hangClipBtn = document.getElementById('hangClip');
 const hangClipIcon = document.getElementById('hangClipIcon');
 const hangClipText = document.getElementById('hangClipText');
@@ -35,7 +34,6 @@ const ICONS = {
 };
 hangClipIcon.innerHTML = ICONS.clip;
 gearBtn.querySelector('.ic').innerHTML = ICONS.gear;
-hintEl.querySelector('.ic').innerHTML = ICONS.list;
 
 // R+ pin button
 const pinViewBtn = document.createElement('button');
@@ -168,6 +166,12 @@ function photoSize(item) {
   return { w: Math.max(24, iw * s), h: Math.max(18, ih * s) };
 }
 
+// 文档卡固定板式：138×116 面 + 边距 = 绳上 150 宽（与图片卡 CARD_W 一致）
+function docCardSize() {
+  const inset = L.CARD_INSET;
+  return { w: L.CARD_W - inset * 2 - 0, h: 118 };
+}
+
 function buildSlot(item) {
   const slot = document.createElement('div');
   slot.className = 'slot flying';
@@ -210,7 +214,9 @@ function renderCardContent(s) {
     }).catch(() => { /* window closing etc. */ });
   }
   const card = s.card;
-  const key = item.kind === 'memo' ? JSON.stringify(item.memo) : (item.thumb ? item.thumb.slice(-48) + item.thumbW + item.thumbH : '');
+  const key = item.kind === 'memo' ? JSON.stringify(item.memo)
+    : item.kind === 'doc' ? 'doc:' + item.docName + ':' + item.docSize
+    : (item.thumb ? item.thumb.slice(-48) + item.thumbW + item.thumbH : '');
   if (s.key === key && card.firstChild) return;
   s.key = key;
   card.innerHTML = '';
@@ -236,7 +242,7 @@ function renderCardContent(s) {
       + '</div>';
     card.appendChild(face);
     s.face = face;
-  } else {
+  } else if (item.kind === 'image') {
     card.classList.add('photo');
     const ps = photoSize(item);
     const clip = document.createElement('div');
@@ -256,6 +262,22 @@ function renderCardContent(s) {
     clip.appendChild(badge);
     card.appendChild(clip);
     s.face = clip;
+  } else if (item.kind === 'doc') {
+    // v1.6 文档卡：类型板式缩略；悬停弹出阅读面板（由 overlay 承载，绳窗太矮）
+    card.classList.add('doc');
+    const ps = docCardSize(item);
+    const face = document.createElement('div');
+    face.className = 'doc-face hit';
+    face.style.width = ps.w + 'px';
+    face.style.height = ps.h + 'px';
+    face.innerHTML = window.DOCR.cardHTML(item);
+    face.addEventListener('click', () => api.send('line:open', item.id));
+    card.appendChild(face);
+    s.face = face;
+    if (item.docType === 'pdf') {
+      const cv = face.querySelector('.doc-page1');
+      if (cv) window.DOCR.attachPdfThumb(cv, item);
+    }
   }
   const xbtn = document.createElement('button');
   xbtn.className = 'discard-x glass';
@@ -306,6 +328,130 @@ function scheduleLayout() {
   setTimeout(() => { if (layoutQueued) { layoutQueued = false; layout(); } }, 120);
 }
 
+// ---- v1.6 横向滚动：绳不动、卡片沿绳滑 -------------------------------------
+// 挂满时不再把间距压到 45px 挤成一团，而是保持自然间距向外溢出，卡片层整体
+// 平移（translateX）。滚轮 / 横向拖拽 / 两端箭头皆可平移；绳的垂曲线固定，
+// 卡片 top 跟随其屏幕 x 重新落位——滑动时有"沿着绳浪走"的物理感。
+const TRACK_MARGIN = 110;   // 两端留白（约半张卡）
+const TRACK_GAP = 46;       // 相邻卡片净距
+let track = null;           // { map:id→trackX中心, addX, contentW, maxScroll }
+let scrollX = 0;
+let prevIds = new Set();
+let scrollPaintQueued = false;
+
+function ropeWidthOf(item) {
+  return item.kind === 'memo'
+    ? (L.RATIOS[(item.memo && item.memo.aspectRatio) || 'wide'] || L.RATIOS.wide).rope.w
+    : L.CARD_W;
+}
+function computeTrack(items, width) {
+  const natural = L.dynamicSpacing(1, width);
+  const widths = items.map(ropeWidthOf);
+  const addW = L.RATIOS.wide.rope.w;
+  const need = TRACK_MARGIN + widths.reduce((a, b) => a + b, 0)
+    + TRACK_GAP * Math.max(0, items.length - 1) + TRACK_GAP + addW + TRACK_MARGIN;
+  if (need <= width - 8) return null; // 装得下 → 保持现行居中布局（scrollX=0）
+  const map = new Map();
+  let acc = TRACK_MARGIN;
+  items.forEach((it, i) => { map.set(it.id, acc + widths[i] / 2); acc += widths[i] + TRACK_GAP; });
+  const contentW = acc + addW + TRACK_MARGIN;
+  return { map, addX: acc + addW / 2, contentW, maxScroll: Math.max(0, contentW - width) };
+}
+function clampScroll(x) { return Math.max(0, Math.min(track ? track.maxScroll : 0, x)); }
+function slotScreenX(item, index, total, width) {
+  const x = track ? track.map.get(item.id) : L.xAt(index, total, width);
+  return { x, sx: x - scrollX };
+}
+function placeRopeTops(items) {
+  // 卡片 top 跟随绳的垂曲线（按屏幕 x 取 ropeY）——平移时沿绳浪滑动
+  const total = items.length + 1;
+  items.forEach((item, index) => {
+    const s = slots.get(item.id);
+    if (!s) return;
+    const x = track ? track.map.get(item.id) : L.xAt(index, total, width);
+    const ry = L.ropeY(x - scrollX, width);
+    s.el.style.top = (ry - L.PIN_ABOVE) + 'px';
+  });
+  if (addSlotEl) {
+    const x = track ? track.addX : L.xAt(items.length, total, width);
+    const ry = L.ropeY(x - scrollX, width);
+    addSlotEl.style.top = (ry - L.PIN_ABOVE) + 'px';
+  }
+}
+function paintScroll() {
+  cardsEl.style.transform = 'translateX(' + (-Math.round(scrollX)) + 'px)';
+  placeRopeTops(state.items);
+  updateScrollUI();
+  reportHitRects();
+  scrollSendThrottled();
+  docPeekDisarm(true);
+}
+function applyScroll(x) {
+  if (!track || track.maxScroll <= 0) return;
+  scrollX = clampScroll(x);
+  if (scrollPaintQueued) return;
+  scrollPaintQueued = true;
+  requestAnimationFrame(() => { scrollPaintQueued = false; paintScroll(); });
+  setTimeout(() => { if (scrollPaintQueued) { scrollPaintQueued = false; paintScroll(); } }, 120);
+}
+let scrollSentAt = 0;
+function scrollSendThrottled() {
+  const now = Date.now();
+  if (now - scrollSentAt < 80) return;
+  scrollSentAt = now;
+  api.send('line:scroll', scrollX);
+}
+// 平滑滚动（箭头点击 / 新卡滚入视野）
+let tween = null;
+function tweenScroll(target) {
+  target = clampScroll(target);
+  if (tween) cancelAnimationFrame(tween.raf);
+  const from = scrollX, d = target - from, t0 = performance.now();
+  if (Math.abs(d) < 1) return;
+  const dur = Math.min(420, 160 + Math.abs(d) * 0.25);
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - k, 3);
+    applyScroll(from + d * e);
+    if (k < 1) tween.raf = requestAnimationFrame(step); else tween = null;
+  };
+  tween = { raf: requestAnimationFrame(step) };
+}
+// 两端箭头 + 底部行程条
+let scL = null, scR = null, scBar = null, scThumb = null;
+function ensureScrollUI() {
+  if (scL) return;
+  scL = document.createElement('button');
+  scL.id = 'scrollPrev'; scL.className = 'scroll-edge'; scL.setAttribute('aria-label', '向左滚动');
+  scL.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><path d="M10 3L5.5 8l4.5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  scL.addEventListener('click', () => tweenScroll(scrollX - width * 0.55));
+  scR = document.createElement('button');
+  scR.id = 'scrollNext'; scR.className = 'scroll-edge'; scR.setAttribute('aria-label', '向右滚动');
+  scR.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><path d="M6 3l4.5 5L6 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  scR.addEventListener('click', () => tweenScroll(scrollX + width * 0.55));
+  scBar = document.createElement('div');
+  scBar.id = 'scrollBar';
+  scThumb = document.createElement('div');
+  scThumb.className = 'scroll-thumb';
+  scBar.appendChild(scThumb);
+  stage.appendChild(scL); stage.appendChild(scR); stage.appendChild(scBar);
+}
+function updateScrollUI() {
+  ensureScrollUI();
+  const on = !!track && track.maxScroll > 4;
+  scL.classList.toggle('show', on && scrollX > 4);
+  scR.classList.toggle('show', on && scrollX < track.maxScroll - 4);
+  scBar.classList.toggle('show', on);
+  if (on) {
+    const trackW = Math.min(width - 240, 420);
+    const tw = Math.max(48, trackW * width / track.contentW);
+    scBar.style.width = trackW + 'px';
+    scBar.style.left = Math.round((width - trackW) / 2) + 'px';
+    scThumb.style.width = Math.round(tw) + 'px';
+    scThumb.style.transform = 'translateX(' + Math.round((trackW - tw) * (scrollX / track.maxScroll)) + 'px)';
+  }
+}
+
 // R154: 增量布局缓存——广播频繁（勾选待办也会广播），多数广播只改内容不改顺序。
 let lastOrder = '';
 let lastWidth = 0;
@@ -325,19 +471,20 @@ function layout() {
   const reposition = order !== lastOrder || width !== lastWidth || animating;
   lastOrder = order;
   lastWidth = width;
+  track = computeTrack(items, width);
+  scrollX = clampScroll(scrollX);
   items.forEach((item, index) => {
     let s = slots.get(item.id);
     if (!s) { s = buildSlot(item); slots.set(item.id, s); }
     s.item = item;
     if (reposition) {
-      const x = L.xAt(index, total, width);
-      const ry = L.ropeY(x, width);
+      const xpos = slotScreenX(item, index, total, width);
       const w = item.kind === 'memo' ? (L.RATIOS[(item.memo.aspectRatio) || 'wide'] || L.RATIOS.wide).rope.w : L.CARD_W;
       const peek = L.peekTransform(index, hIdx, items.length);
-      s.el.style.left = (x - w / 2) + 'px';
-      s.el.style.top = (ry - L.PIN_ABOVE) + 'px';
+      s.el.style.left = (xpos.x - w / 2) + 'px';
+      s.el.style.top = (L.ropeY(xpos.sx, width) - L.PIN_ABOVE) + 'px';
       s.el.style.width = w + 'px';
-      s.el.style.height = (L.PANEL_H - ry) + 'px';
+      s.el.style.height = (L.PANEL_H - L.ropeY(xpos.sx, width)) + 'px';
       s.el.style.zIndex = peek.z;
       s.el.style.transform = 'translate(' + peek.xOff + 'px, ' + peek.yOff + 'px) rotate(' + peek.tilt + 'deg)';
       const wasFalling = s.el.classList.contains('falling');
@@ -383,10 +530,20 @@ function layout() {
   if (reposition) for (const entry of Array.from(slots.entries())) {
     if (!items.find(i => i.id === entry[0])) { entry[1].el.remove(); thumbCache.delete(entry[0]); slots.delete(entry[0]); }
   }
+  // v1.6 新上绳的卡片自动滚入视野（拖入/挂绳时往往已滚到别处）
+  for (const item of items) {
+    if (prevIds.has(item.id) || item.falling || item.flying || !track) continue;
+    const x = track.map.get(item.id);
+    if (x == null) continue;
+    const sx = x - scrollX;
+    if (sx < 60 || sx > width - 60) tweenScroll(x - width * 0.4);
+  }
+  prevIds = new Set(items.map(i => i.id));
+  placeRopeTops(items);
+  cardsEl.style.transform = 'translateX(' + (-Math.round(scrollX)) + 'px)';
   updateAddCard(total, hIdx, items.length);
   updateWelcomeCard(items.length);
-  hintEl.style.top = (L.ropeY(width / 2, width) + 165) + 'px';
-  hintEl.classList.toggle('hidden', items.length > 0);
+  updateScrollUI();
   reportHitRects();
 }
 
@@ -399,8 +556,8 @@ function updateAddCard(total, hIdx, itemCount) {
     addSlotEl.addEventListener('click', () => api.send('line:open-editor', null));
     cardsEl.appendChild(addSlotEl);
   }
-  const x = L.xAt(itemCount, total, width);
-  const ry = L.ropeY(x, width);
+  const x = track ? track.addX : L.xAt(itemCount, total, width);
+  const ry = L.ropeY(x - scrollX, width);
   const off = L.addCardPeekOffset(hIdx, itemCount);
   addSlotEl.style.left = (x - L.RATIOS.wide.rope.w / 2) + 'px';
   addSlotEl.style.top = (ry - L.PIN_ABOVE) + 'px';
@@ -522,7 +679,26 @@ function setHoveredSlot(id) {
   hoveredId = id || null;
   const next = id && slots.get(id);
   if (next && next.el) next.el.classList.add('hover');
+  // v1.6 文档卡：悬停 320ms 后弹出阅读面板（overlay 承载，绳窗只有 275 高）
+  if (next && next.item && next.item.kind === 'doc' && !next.item.falling) docPeekArm(id);
+  else docPeekDisarm();
   applyPeek();
+}
+// ---- v1.6 文档悬停阅读弹出（防扫过误触：320ms 驻留） ------------------------
+// 面板是粘性的：hover 变化不再发关闭，关闭走 Esc/点面板外/✕/大图（overlay 侧）。
+let docPeekTimer = null, docPeekId = null;
+function docPeekArm(id) {
+  if (docPeekId === id) return;
+  docPeekDisarm();
+  docPeekId = id;
+  docPeekTimer = setTimeout(() => {
+    docPeekTimer = null;
+    if (docPeekId && hoveredId === docPeekId) api.send('line:doc-peek', { id: docPeekId });
+  }, 320);
+}
+function docPeekDisarm() {
+  docPeekId = null;
+  if (docPeekTimer) { clearTimeout(docPeekTimer); docPeekTimer = null; }
 }
 cardsEl.addEventListener('mouseover', ev => {
   const hit = ev.target.closest && ev.target.closest('.hit');
@@ -538,7 +714,14 @@ hotZones.forEach(zone => {
 });
 cardsEl.addEventListener('mousedown', ev => {
   const slotEl = ev.target.closest('.slot');
-  if (!slotEl || !slotEl.dataset.id) return;
+  if (!slotEl || !slotEl.dataset.id) {
+    // v1.6 空绳区直接抓取平移（所见即所得地"拖绳子"）
+    if (ev.button === 0 && track && track.maxScroll > 0 && !(ev.target.closest && ev.target.closest('button'))) {
+      dragState = { id: null, empty: true, x0: ev.screenX, y0: ev.screenY, moved: true, slotEl: null, panFrom: scrollX, panX0: ev.screenX, panning: true };
+      document.body.classList.add('panning');
+    }
+    return;
+  }
   const id = slotEl.dataset.id;
   const s = slots.get(id);
   if (!s || s.item.falling) return;
@@ -553,6 +736,7 @@ function clearPress() {
   const ind = document.getElementById('reorderIndicator');
   if (ind) ind.remove();
   document.body.classList.remove('reordering');
+  document.body.classList.remove('panning');
   document.querySelectorAll('.slot.reordering').forEach(e => e.classList.remove('reordering'));
   if (dragState) { clearTimeout(dragState.longTimer); dragState = null; }
 }
@@ -576,6 +760,12 @@ window.addEventListener('mousemove', ev => {
 function mousemoveWork(ev) {
   const overSlot = !!(ev.target && ev.target.closest && ev.target.closest('.slot'));
   if (!overSlot && hoveredId) setHoveredSlot(null);
+  if (dragState && dragState.panning) {
+    if (!(ev.buttons & 1)) { clearPress(); return; } // 按键在窗外松开：下次移动自愈
+    // v1.6 绳上平移：轴锁判定为横向主导后，横向移动即滚动绳
+    applyScroll(dragState.panFrom - (ev.screenX - dragState.panX0));
+    return;
+  }
   if (dragState) {
     const dx = ev.screenX - dragState.x0, dy = ev.screenY - dragState.y0;
     if (Math.hypot(dx, dy) > 4) {
@@ -587,8 +777,15 @@ function mousemoveWork(ev) {
         dragState.slotEl.classList.add('reordering');
         document.body.classList.add('reordering');
       }
+      else if (track && track.maxScroll > 0 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+        // 横向主导 → 平移绳（轴锁），代替原生文件拖出；纵向仍可拖出文件
+        dragState.panning = true;
+        dragState.panFrom = scrollX;
+        dragState.panX0 = ev.screenX;
+        document.body.classList.add('panning');
+      }
       else startDrag(dragState.id); // plain drag = native file drag (drop into chat apps etc.)
-      if (!dragState.reordering && !dragState.tearing) clearPress();
+      if (!dragState.reordering && !dragState.tearing && !dragState.panning) clearPress();
     }
     if (dragState && dragState.reordering && !dragState.reorderDone) {
       const steps = Math.round((ev.screenX - dragState.x0) / 205);
@@ -1025,13 +1222,21 @@ setInterval(() => {
 const FONT_STEPS = ['sm', 'md', 'lg'];
 const FONT_NAMES = { sm: '小字号', md: '中字号', lg: '大字号' };
 window.addEventListener('wheel', ev => {
-  if (!ev.ctrlKey) return;
-  ev.preventDefault(); // 防 Ctrl+滚轮页面缩放
-  const i = FONT_STEPS.indexOf(document.body.dataset.font || 'md');
-  const next = FONT_STEPS[(i + (ev.deltaY < 0 ? 1 : -1) + FONT_STEPS.length) % FONT_STEPS.length];
-  document.body.dataset.font = next;
-  api.send('settings:set', { key: 'cardFont', value: next });
-  showHintToast('卡片字号：' + FONT_NAMES[next]);
+  if (ev.ctrlKey) {
+    ev.preventDefault(); // 防 Ctrl+滚轮页面缩放
+    const i = FONT_STEPS.indexOf(document.body.dataset.font || 'md');
+    const next = FONT_STEPS[(i + (ev.deltaY < 0 ? 1 : -1) + FONT_STEPS.length) % FONT_STEPS.length];
+    document.body.dataset.font = next;
+    api.send('settings:set', { key: 'cardFont', value: next });
+    showHintToast('卡片字号：' + FONT_NAMES[next]);
+    return;
+  }
+  // v1.6 滚轮横滚绳（阅读面板内的滚动不劫持）
+  if (ev.target && ev.target.closest && ev.target.closest('.docr')) return;
+  if (!track || track.maxScroll <= 0) return;
+  ev.preventDefault();
+  const d = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+  applyScroll(scrollX + d);
 }, { passive: false });
 // R145: Windows 显示缩放（125%/150%切换）触发的 resize 由 layout()/drawRope() 按
 // innerWidth 重建；ropeWidthDrawn 挡住连发 resize 的重复重绘，天然 debounce，无需额外定时器。

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:">
 <link rel="stylesheet" href="../common.css">
 <link rel="stylesheet" href="overlay.css">
 </head>
@@ -17,6 +17,11 @@
   <div id="fxLayer"></div>
   <script src="../common.js"></script>
   <script src="../../src/layout.js"></script>
+  <script src="../vendor/jszip/jszip.min.js"></script>
+  <script src="../vendor/marked/marked.min.js"></script>
+  <script src="../vendor/dompurify/purify.min.js"></script>
+  <script src="../vendor/docx/docx-preview.min.js"></script>
+  <script src="../docreader.js"></script>
   <script src="overlay.js"></script>
 </body>
 </html>

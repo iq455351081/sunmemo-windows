@@ -12,20 +12,27 @@ html, body { background: transparent; overflow: hidden; width: 100%; height: 100
   margin: 8px auto 0;
   position: relative;
   border-radius: 13px;
-  background: rgba(38, 38, 46, 0.97);
+  background: linear-gradient(180deg, rgba(50, 48, 58, 0.97), rgba(33, 32, 40, 0.97));
   border: 1px solid rgba(255, 170, 60, 0.35);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  display: flex; align-items: center; justify-content: center;
-  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   cursor: pointer;
-  /* R165: 宽度零过渡——宽度动画期间 flex 子元素被挤压变形（用户实测）。label 淡入承担动效 */
+  /* v1.6: 子元素绝对定位后宽度过渡不再挤压变形（R165 的 flex 挤压根因已除）
+     ——展开恢复平滑弹簧，label 淡入，不再"啪"地变形成黑条 */
+  transition: width 220ms cubic-bezier(0.26, 1.2, 0.48, 1), box-shadow 200ms ease, border-color 200ms ease;
   overflow: hidden;
 }
+/* 太阳永远居中于胶囊（margin 居中随宽度过渡自动跟移，用户指定的样式） */
+#beacon .sun { position: absolute; left: 50%; top: 50%; margin: -7.5px 0 0 -7.5px; }
 #beacon .label {
+  position: absolute; left: calc(50% + 15px); top: 50%; transform: translateY(-50%) translateX(-6px);
   font-size: 11px; font-weight: 700; color: rgba(255, 232, 190, 1);
-  white-space: nowrap; opacity: 0; width: 0; overflow: hidden;
-  transition: opacity 140ms ease, transform 140ms ease;
-  transform: translateX(-6px);
+  white-space: nowrap; opacity: 0;
+  transition: opacity 150ms ease 60ms, transform 150ms ease 60ms;
+}
+#beacon:hover {
+  width: 118px;
+  border-color: rgba(255, 180, 80, 0.55);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), 0 0 14px rgba(255, 165, 60, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 @media (prefers-color-scheme: dark) {
   #beacon .label { color: rgba(255, 225, 180, 1); }
@@ -37,8 +44,14 @@ html, body { background: transparent; overflow: hidden; width: 100%; height: 100
   content: ''; position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.01);
 }
-#beacon:hover { width: 118px; }
-#beacon:hover .label { opacity: 1; transform: translateX(0); transition: opacity 160ms ease 80ms, transform 160ms ease 80ms; }
+#beacon:hover .label { opacity: 1; transform: translateY(-50%) translateX(0); transition: opacity 160ms ease 110ms, transform 160ms ease 110ms; }
+/* 拖文件悬于信标上：胶囊铺满窗口高亮，提示"松手挂到绳上" */
+#beacon.dropping {
+  width: 160px;
+  border-color: rgba(255, 185, 90, 0.9);
+  box-shadow: 0 0 0 3px rgba(255, 165, 60, 0.35), 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+#beacon.dropping .label { opacity: 1; transform: translateY(-50%) translateX(0); color: rgba(255, 236, 200, 1); }
 
 .sun {
   width: 15px; height: 15px;
@@ -58,7 +71,10 @@ body.day   .sun { background: radial-gradient(circle at 35% 35%, #ffe9a8, #ffb14
 body.dusk  .sun { background: radial-gradient(circle at 35% 35%, #ffd9a3, #ff8a3d 60%, #ff5722); box-shadow: 0 0 8px 2px rgba(255, 110, 50, 0.80); }
 body.night .sun { background: radial-gradient(circle at 35% 35%, #eef4ff, #b4c8e6 60%, #8aa6d6); box-shadow: 0 0 7px 2px rgba(170, 200, 255, 0.70); }
 @media (prefers-color-scheme: dark) {
-  #beacon { background: rgba(20, 20, 26, 0.97); border-color: rgba(255, 170, 60, 0.55); }
+  #beacon { background: linear-gradient(180deg, rgba(30, 29, 36, 0.97), rgba(20, 20, 26, 0.97)); border-color: rgba(255, 170, 60, 0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #beacon { transition: none; }
 }
 body.power-save .sun { transform: none !important; }
 body.power-save .rays { display: none !important; }

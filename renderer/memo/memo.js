@@ -318,3 +318,72 @@ editor.focus();
 // R167: 窗口入场 —— ready-to-show 后补 .in 触发 memo.css 的 #sheet 展开过渡
 // （窗口隐藏期间 rAF 不触发，类在首次 show 后的首帧才加上，正好是入场时机）
 requestAnimationFrame(() => document.body.classList.add('in'));
+
+// ---- v1.6 拖文本/拖文本文件进速记窗 = 直接粘内容 ----------------------------
+// 从别的应用拖选中的文字、或拖 .txt/.md/.csv/.log 文件、甚至从绳上拖便签卡
+// （其 json）进来——进的都是"内容"，绝不当成附件。
+const DROP_TEXT_RE = /\.(txt|md|markdown|log|csv|json)$/i;
+let dropChip = null;
+function showDropChip(msg, sticky) {
+  if (!dropChip) {
+    dropChip = document.createElement('div');
+    dropChip.className = 'drop-chip';
+    document.body.appendChild(dropChip);
+  }
+  dropChip.textContent = msg;
+  dropChip.classList.add('show');
+  dropChip.classList.toggle('warn', /仅支持|失败/.test(msg));
+  if (dropChip._t) clearTimeout(dropChip._t);
+  if (!sticky) dropChip._t = setTimeout(() => dropChip.classList.remove('show'), 1900);
+}
+function hideDropChip() { if (dropChip) dropChip.classList.remove('show'); }
+function insertAtCursor(text2) {
+  const ins = String(text2 || '').replace(/\r\n/g, '\n');
+  if (!ins) return false;
+  const a = editor.selectionStart, b = editor.selectionEnd;
+  editor.setRangeText(ins, a, b, 'end');
+  syncText();
+  editor.focus();
+  return true;
+}
+document.addEventListener('dragover', ev => {
+  ev.preventDefault();
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+  if (sheet && !sheet.classList.contains('dropping')) sheet.classList.add('dropping');
+});
+document.addEventListener('dragleave', ev => {
+  if (!ev.relatedTarget) { sheet.classList.remove('dropping'); hideDropChip(); }
+});
+document.addEventListener('drop', async ev => {
+  ev.preventDefault();
+  sheet.classList.remove('dropping');
+  const dt = ev.dataTransfer;
+  if (!dt) return;
+  // 1) 拖的是选中文字（任何应用）——直接按纯文本插入
+  const plain = dt.getData ? (dt.getData('text/plain') || '') : '';
+  if (plain.trim()) {
+    insertAtCursor(plain);
+    showDropChip('已插入 ' + plain.trim().length + ' 个字');
+    return;
+  }
+  // 2) 拖的是文件：文本类读入内容；绳上便签 json 取 text 字段
+  if (dt.files && dt.files.length && api.getPathForFile) {
+    let inserted = 0, firstErr = '';
+    for (const f of dt.files) {
+      const p = api.getPathForFile(f);
+      if (!p) continue;
+      if (!DROP_TEXT_RE.test(p)) { firstErr = '仅支持文本类文件（txt / md / csv / json）'; continue; }
+      try {
+        const r = await api.invoke('doc:load-text', p);
+        if (!r.ok) { firstErr = '读取失败：' + r.err; continue; }
+        let content = r.text;
+        if (/\.json$/i.test(p)) {
+          try { content = (JSON.parse(content) || {}).text || content; } catch { /* 非便签 json 就原文插入 */ }
+        }
+        if (insertAtCursor(content)) inserted++;
+      } catch (e) { firstErr = '读取失败：' + (e && e.message || e); }
+    }
+    if (inserted > 0) showDropChip(inserted > 1 ? ('已插入 ' + inserted + ' 个文件的内容') : '已插入文件内容');
+    else showDropChip(firstErr || '没有可插入的内容');
+  }
+});

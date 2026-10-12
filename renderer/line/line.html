@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:">
 <link rel="stylesheet" href="../common.css">
 <link rel="stylesheet" href="line.css">
 </head>
@@ -16,12 +16,14 @@
       </button>
       <button id="gear" class="glass gear-btn" title="自定义快捷键与防误触设置" aria-label="设置"><span class="ic" aria-hidden="true"></span></button>
     </div>
-    <div id="hint" class="hint glass">
-      <span class="ic"></span><span>截图后将晾在这里 · Ctrl+Alt+N 记一条</span>
-    </div>
   </div>
   <script src="../../src/layout.js"></script>
   <script src="../common.js"></script>
+  <script src="../vendor/jszip/jszip.min.js"></script>
+  <script src="../vendor/marked/marked.min.js"></script>
+  <script src="../vendor/dompurify/purify.min.js"></script>
+  <script src="../vendor/docx/docx-preview.min.js"></script>
+  <script src="../docreader.js"></script>
   <script src="line.js"></script>
 </body>
 </html>

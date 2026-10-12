@@ -12,7 +12,7 @@
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
 ![electron](https://img.shields.io/badge/Electron-43-47848F)
-![version](https://img.shields.io/badge/version-1.5.0-ff8f1f)
+![version](https://img.shields.io/badge/version-1.6.0-ff8f1f)
 ![tests](https://img.shields.io/badge/tests-19%E8%87%AA%E6%B5%8B%20%2B%2026%20E2E-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -29,9 +29,12 @@
 ## ✨ 核心体验
 
 - 🖱 **单击预览，Esc 收起** —— 点任意卡片，便签沿悬链线弹到屏幕中央成为大图预览；清单可在预览里直接打勾，实时同步回绳上
+- 📄 **文档挂绳 · 悬停即读** —— MD / PDF / Word 拖上绳即成类型化文档卡；悬停在桌面正中弹出阅读面板（PDF.js / docx-preview 高保真渲染，可滚动翻页），粘性面板不跟丢鼠标
 - 🔍 **悬停即放大** —— 鼠标放到图片卡上，照片原地 Dock 式弹簧放大 3×，小图瞬间可读；移开即回落，设置可关
+- ↔️ **挂满一屏也不怕** —— 卡片保持自然间距，滚轮 / 拖拽左右平移，两端箭头 + 行程条；卡片始终沿绳的垂曲线滑动
 - ✅ **智能清单** —— 速记里回车自动续 `- [ ]`，绳上直接打勾，全部完成时撒花庆祝
-- 📋 **截图 / 剪贴板接管** —— <kbd>Ctrl+Alt+V</kbd> 挂上剪贴板；截图落盘即自动上绳；本地图片可直接拖入绳上
+- 📋 **截图 / 剪贴板接管** —— <kbd>Ctrl+Alt+V</kbd> 挂上剪贴板；截图落盘即自动上绳；本地图片与文档可直接拖入绳上
+- ✍️ **拖文本即粘** —— 从任何应用拖选中的文字（或 .txt / .md 文件）进速记窗，直接按内容粘贴，绝不当附件
 - 📌 **贴桌便签** —— <kbd>Shift+拖拽</kbd> 把便签贴到桌面：可编辑（实时回写）、置顶窗、半透明，随时放回绳上
 - 💾 **Markdown 实时备份** —— 全部内容实时同步到 `文档\SunMemo.md`，Obsidian / Typora 随时查看，永不丢数据
 - 🎨 **六主题 + 深色模式** —— 跟随系统深浅色，自定义取色器实时广播到全部窗口
@@ -104,7 +107,7 @@ node tools/mem-baseline.mjs  # 内存基线采样
 
 ## 📦 版本
 
-当前 **v1.5.0** —— 悬停图片自动放大、缩略图三级自愈。完整历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前 **v1.6.0** —— 文档挂绳与悬停阅读、绳上横向滚动、拖文本直粘。完整历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 📄 License
 
