@@ -199,7 +199,7 @@ function renderHero(item) {
   const docHost = heroCard.querySelector('.hero-doc-host');
   if (docHost && item.kind === 'doc') {
     if (heroDocDispose) { heroDocDispose(); heroDocDispose = null; }
-    window.DOCR.buildReader(item, { width: size.w - 36, pdfPages: 8 }).then(({ el, dispose }) => {
+    window.DOCR.buildReader(item, { width: size.w - 36, pdfPages: 0 }).then(({ el, dispose }) => {
       if (!docHost.isConnected) { dispose(); return; }
       docHost.appendChild(el);
       heroDocDispose = dispose;

@@ -1,7 +1,10 @@
 'use strict';
 // v1.6 三功能冒烟：文档卡上绳 → 悬停弹出阅读 → 滚动平移 → 速记窗拖文本
+// 素材自愈：门禁产物可能被中途清理，先重建再跑
+import { execSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
+execSync('python _gen-docs.py && python _gen-docx.py', { cwd: process.cwd(), stdio: 'ignore' });
 const E = String.fromCharCode(92);
 const APP = ['E:', 'Agentic_Engineering', 'ZCode', 'sunidea'].join(E);
 const DOCS = APP + E + '_docs';

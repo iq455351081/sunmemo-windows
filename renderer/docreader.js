@@ -151,7 +151,7 @@
 
     const renderTasks = new Set();
     let disposed = false;
-    const dispose = () => {
+    let dispose = () => {
       disposed = true;
       renderTasks.forEach(t => { try { t.cancel(); } catch { /* done */ } });
       renderTasks.clear();
@@ -162,6 +162,9 @@
         const r = await api.invoke('doc:load-text', item.url);
         if (disposed) return { el, dispose };
         if (!r.ok) throw new Error(r.err || '读取失败');
+        // 先让加载态画一帧，再做大解析——消除打开瞬间的卡顿
+        await new Promise(res => requestAnimationFrame(res));
+        if (disposed) return { el, dispose };
         if (item.docType === 'md') {
           // 文档级排版：marked(GFM 表格/嵌套列表/代码块/链接) + DOMPurify 消毒；
           // 失败回退到内置 markdown-lite。
@@ -190,31 +193,52 @@
         const doc = await loadPdf(item);
         if (disposed) return { el, dispose };
         const total = doc.numPages;
-        const n = Math.min(pdfPages, total);
+        // pdfPages<=0 = 全部页（大图阅读）；>0 = 速览前 N 页（悬停面板）
+        const limit = pdfPages > 0 ? Math.min(pdfPages, total) : total;
         body.innerHTML = '';
-        for (let i = 1; i <= n; i++) {
-          const page = await doc.getPage(i);
-          if (disposed) return { el, dispose };
+        const dpr = window.devicePixelRatio || 1;
+        const pageW = Math.max(200, width - 36);
+        const renderInto = async (wrap, idx) => {
+          const page = await doc.getPage(idx);
+          if (disposed) return;
           const base = page.getViewport({ scale: 1 });
-          const s = (width - 36) / base.width;
-          const vp = page.getViewport({ scale: s * (window.devicePixelRatio || 1) });
-          const wrap = document.createElement('div');
-          wrap.className = 'docr-pdf-page';
-          wrap.style.height = Math.round(vp.height / (window.devicePixelRatio || 1)) + 'px';
+          const s = pageW / base.width;
+          const vp = page.getViewport({ scale: s * dpr });
           const cv = document.createElement('canvas');
           cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+          wrap.style.height = Math.round(vp.height / dpr) + 'px';
           wrap.appendChild(cv);
-          body.appendChild(wrap);
           const task = page.render({ canvasContext: cv.getContext('2d'), viewport: vp });
           renderTasks.add(task);
           task.promise.then(() => renderTasks.delete(task)).catch(() => {});
-          if (i === 1) {
-            const foot = document.createElement('div');
-            foot.className = 'docr-pdf-foot';
-            foot.textContent = '共 ' + total + ' 页' + (total > n ? ' · 悬停速览前 ' + n + ' 页，点击卡片看大图' : '');
-            body.appendChild(foot);
-          }
-        }
+        };
+        // 余页占位 + 滚动懒渲染：大文件全量可读，打开也不再卡顿
+        const io = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+          entries.forEach(en => {
+            if (!en.isIntersecting) return;
+            const wrap = en.target;
+            io.unobserve(wrap);
+            wrap.classList.remove('pending');
+            renderInto(wrap, Number(wrap.dataset.page)).catch(() => {});
+          });
+        }, { root: body, rootMargin: '700px 0px' }) : null;
+        const addPage = (idx, immediate) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'docr-pdf-page pending';
+          wrap.dataset.page = idx; // 懒渲染回调从这里取页码
+          wrap.style.height = Math.round(pageW * 1.414) + 'px'; // A4 估算高，渲染后校正
+          body.appendChild(wrap);
+          if (immediate || !io) { wrap.classList.remove('pending'); renderInto(wrap, idx).catch(() => {}); }
+          else io.observe(wrap);
+        };
+        addPage(1, true); // 首页立即渲染
+        for (let pg = 2; pg <= limit; pg++) addPage(pg, false);
+        const foot = document.createElement('div');
+        foot.className = 'docr-pdf-foot';
+        foot.textContent = '共 ' + total + ' 页' + (total > limit ? ' · 悬停速览前 ' + limit + ' 页，点击卡片看全部' : '');
+        if (limit < total) body.appendChild(foot);
+        const oldDispose = dispose;
+        dispose = () => { if (io) io.disconnect(); oldDispose(); };
       } else if (item.docType === 'docx') {
         if (typeof window.docx === 'undefined') throw new Error('docx 渲染器未加载');
         const r = await api.invoke('doc:load', item.url);
@@ -238,4 +262,7 @@
   }
 
   window.DOCR = { META, meta: t => META[t] || META.txt, sizeText, mtimeText, cardHTML, attachPdfThumb, buildReader };
+
+  // 预热：空闲时提前加载 PDF.js 渲染模块（首次打开 PDF 不再卡顿）
+  setTimeout(() => { pdfjs().catch(() => { /* 网络盘/杀软竞态，用时重试 */ }); }, 2500);
 })();

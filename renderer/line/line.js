@@ -242,6 +242,15 @@ function renderCardContent(s) {
       + '</div>';
     card.appendChild(face);
     s.face = face;
+    // v1.6.1 便签拖出 = 文本内容：拖进聊天框直接发文字，而不是 json 附件。
+    // Alt/Shift 手势（重排/撕下）在 mousedown 时动态关掉 draggable 走旧管线。
+    face.draggable = true;
+    face.addEventListener('dragstart', ev => {
+      if (!item.memo || !item.memo.text) { ev.preventDefault(); return; }
+      ev.dataTransfer.setData('text/plain', item.memo.text);
+      ev.dataTransfer.effectAllowed = 'copyMove';
+    });
+    face.addEventListener('dragend', () => clearPress());
   } else if (item.kind === 'image') {
     card.classList.add('photo');
     const ps = photoSize(item);
@@ -726,6 +735,8 @@ cardsEl.addEventListener('mousedown', ev => {
   const s = slots.get(id);
   if (!s || s.item.falling) return;
   if (ev.button !== 0) return;
+  const mf = slotEl.querySelector('.memo-face');
+  if (mf) mf.draggable = !(ev.altKey || ev.shiftKey); // Alt/Shift 走重排/撕下管线，其余交给 HTML5 文本拖出
   slotEl.classList.add('pressed');
   dragState = { id, x0: ev.screenX, y0: ev.screenY, moved: false, slotEl, reorder: ev.altKey, tear: ev.shiftKey };
   dragState.longTimer = setTimeout(() => {
@@ -737,6 +748,7 @@ function clearPress() {
   if (ind) ind.remove();
   document.body.classList.remove('reordering');
   document.body.classList.remove('panning');
+  document.querySelectorAll('.memo-face').forEach(f => { f.draggable = true; });
   document.querySelectorAll('.slot.reordering').forEach(e => e.classList.remove('reordering'));
   if (dragState) { clearTimeout(dragState.longTimer); dragState = null; }
 }
@@ -783,6 +795,10 @@ function mousemoveWork(ev) {
         dragState.panFrom = scrollX;
         dragState.panX0 = ev.screenX;
         document.body.classList.add('panning');
+      }
+      else if (s && s.item && s.item.kind === 'memo') {
+        // 便签：交给 HTML5 文本拖出（dragstart 已带 text/plain），
+        // 此处不动作——浏览器接管后 mousemove/mouseup 停止，dragend 里清理。
       }
       else startDrag(dragState.id); // plain drag = native file drag (drop into chat apps etc.)
       if (!dragState.reordering && !dragState.tearing && !dragState.panning) clearPress();
