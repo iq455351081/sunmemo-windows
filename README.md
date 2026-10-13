@@ -12,7 +12,7 @@
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
 ![electron](https://img.shields.io/badge/Electron-43-47848F)
-![version](https://img.shields.io/badge/version-1.6.0-ff8f1f)
+![version](https://img.shields.io/badge/version-1.7.0-ff8f1f)
 ![tests](https://img.shields.io/badge/tests-19%E8%87%AA%E6%B5%8B%20%2B%2026%20E2E-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -39,6 +39,9 @@
 - 💾 **Markdown 实时备份** —— 全部内容实时同步到 `文档\SunMemo.md`，Obsidian / Typora 随时查看，永不丢数据
 - 🎨 **六主题 + 深色模式** —— 跟随系统深浅色，自定义取色器实时广播到全部窗口
 - 🌬 **环境氛围** —— 挂绳 Tink 声、完成 Pop 声、可开关的轻风白噪声、待机时呼吸发光的太阳信标
+- 🐦 **绳上小鸟与太阳种子** —— 小鸟随机来访小憩；完成当天全部待办，它会叼来一颗太阳种子挂在绳尾
+- 🕰 **时光晾衣绳** —— 撕下的便签按周陈列成回忆板，点击任意一张即可放回绳上
+- ◐ **每日发现卡** —— 绳尾图文卡片每 5 分钟轮换好书 / 电影 / 音乐 / 格言 / 知识点，每天一套新组合
 
 ## 🔍 悬停即放大（v1.5.0 新增）
 
@@ -107,7 +110,7 @@ node tools/mem-baseline.mjs  # 内存基线采样
 
 ## 📦 版本
 
-当前 **v1.6.0** —— 文档挂绳与悬停阅读、绳上横向滚动、拖文本直粘。完整历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前 **v1.7.0** —— 绳上小鸟、太阳种子、时光回忆板与每日发现卡。完整历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 📄 License
 

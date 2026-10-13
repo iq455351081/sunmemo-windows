@@ -62,6 +62,7 @@ const COMMANDS = [
   { key: '🖼', label: '上传本地图片', cmd: uploadImageCmd },
   { key: '📌', label: '钉住（不再自动隐藏）', cmd: () => api.send('line:toggle-userpin') },
   { key: '🔍', label: '搜索便签窗', cmd: () => api.send('search:open-tag', null) },
+  { key: '🕰', label: '时光晾衣绳（回忆归档便签）', cmd: () => api.send('line:memory') },
 ];
 // 本地图片上传：main 无托盘上传专用 IPC（uploadLocalImage 仅托盘可达），但
 // line:drop-file 已存在（R94 拖拽落绳同通道）。隐藏 <input type=file> 是用户
@@ -229,6 +230,14 @@ function renderCardContent(s) {
     face.style.width = r.content.w + 'px';
     face.style.height = r.content.h + 'px';
     face.style.background = window.cardGradient(item.memo.color);
+    // v1.7 晒褪色：晾了几天没动的便签被太阳"晒旧"（saturate 渐降），交互即恢复
+    {
+      const touched = item.memo.touchedAt || item.memo.createdAt;
+      const days = Math.max(0, Math.floor((Date.now() - new Date(touched).getTime()) / 86400000));
+      if (days >= 4) face.classList.add('age-2');
+      else if (days >= 1) face.classList.add('age-1');
+      if (days >= 1) face.title = '晾了 ' + days + ' 天了 · 动一动它就恢复鲜艳';
+    }
     face.innerHTML = (item.memo.pinned ? '<span class="pin-badge" title="已置顶">📌</span>' : '')
       + '<div class="memo-body">' + window.renderCardBody(item.memo.text, { done: item.memo.isDone }) + '</div>'
       + (tags.length ? '<div class="tag-row">' + tags.map(t => '<span class="tag-chip">#' + t + '</span>').join('') + '</div>' : '')
@@ -345,6 +354,10 @@ const TRACK_MARGIN = 110;   // 两端留白（约半张卡）
 const TRACK_GAP = 46;       // 相邻卡片净距
 let track = null;           // { map:id→trackX中心, addX, contentW, maxScroll }
 let scrollX = 0;
+// v1.7 趣味件状态（必须先于 placeRopeTops 定义——早期广播会触发 layout）
+let birdEl = null, birdLeaveTimer = null;
+let discoverSlotEl = null;
+let discoverIdx = Math.floor(Date.now() / 300000);
 let prevIds = new Set();
 let scrollPaintQueued = false;
 
@@ -385,6 +398,11 @@ function placeRopeTops(items) {
     const x = track ? track.addX : L.xAt(items.length, total, width);
     const ry = L.ropeY(x - scrollX, width);
     addSlotEl.style.top = (ry - L.PIN_ABOVE) + 'px';
+  }
+  if (typeof updateDiscover === 'function') updateDiscover();
+  if (typeof attachSeed === 'function') {
+    const seed = document.getElementById('ropeSeed');
+    if (seed) { seed.style.left = Math.round(width - 58) + 'px'; seed.style.top = Math.round(L.ropeY(width - 58, width) - 14) + 'px'; }
   }
 }
 function paintScroll() {
@@ -1026,7 +1044,19 @@ function playFanfare() {
     o.start(t + i * 0.11); o.stop(t + i * 0.11 + 0.55);
   });
 }
-const SOUNDS = { tink: playTink, pop: playPop, trash: playTrash, beep: playBeep, blip: playBlip, fanfare: playFanfare };
+function playChirp(volume = 0.22) {
+  const c = ctxA(), t = c.currentTime;
+  const out = c.createGain(); out.gain.value = volume * 0.5; out.connect(c.destination);
+  [[3400, 0, 0.05], [2900, 0.08, 0.06], [3600, 0.17, 0.05]].forEach(fd => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(fd[0], t + fd[1]);
+    g.gain.setValueAtTime(0.55, t + fd[1]);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + fd[1] + fd[2] + 0.05);
+    o.connect(g); g.connect(out);
+    o.start(t + fd[1]); o.stop(t + fd[1] + fd[2] + 0.06);
+  });
+}
+const SOUNDS = { tink: playTink, pop: playPop, trash: playTrash, beep: playBeep, blip: playBlip, fanfare: playFanfare, chirp: playChirp };
 api.on('play-sound', d => { (SOUNDS[d.name] || playTink)(d.volume, d.pitch); });
 // R110: ambient wind — a very soft filtered-noise loop with slow gusts.
 // R139: gain scales with the settings volume (curVol arrives via 'settings-volume';
@@ -1210,6 +1240,7 @@ function checkAllDone(items) {
   prevAllDone = all;
 }
 function celebrate() {
+  birdBringsSeed(); // 全天待办完成：小鸟叼来太阳种子（当日有效，跨重启保留）
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (document.body.classList.contains('power-save')) return;
   playFanfare();
@@ -1273,3 +1304,112 @@ document.addEventListener('keydown', ev => {
 });
 layout();
 api.send('line:ready');
+
+// ---- v1.7 绳上趣味三件套：小鸟 / 太阳种子 / 每日发现卡 ----------------------
+
+// —— 小鸟：随机来访，点击飞走；全天待办完成时叼来一颗太阳种子 ——
+const BIRD_SVG = '<svg viewBox="0 0 40 30" width="36" height="27">'
+  + '<path d="M28 21 L38 15 L33 24 Z" fill="#c98a3a"/>'
+  + '<ellipse cx="17" cy="17" rx="13" ry="9.5" fill="#ffcf5e"/>'
+  + '<path d="M6 16 Q14 8 24 14 Q18 20 6 16Z" fill="#e8a23e"/>'
+  + '<circle cx="27" cy="11" r="5.5" fill="#ffd97a"/>'
+  + '<path d="M32 10 l6 2 -6 2 Z" fill="#ff9c3f"/>'
+  + '<circle cx="28.5" cy="10" r="1.3" fill="#3a2c14"/>'
+  + '</svg>';
+function reducedMotion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function spawnBird(withSeed) {
+  if (birdEl) return;
+  const x = Math.round(width * (0.18 + Math.random() * 0.58));
+  const y = Math.round(L.ropeY(x, width) - 24);
+  birdEl = document.createElement('div');
+  birdEl.id = 'ropeBird';
+  birdEl.style.cssText = 'position:absolute;z-index:6000;cursor:pointer;';
+  birdEl.innerHTML = BIRD_SVG + (withSeed ? '<div class="bird-seed"></div>' : '');
+  birdEl.title = withSeed ? '今天的待办全部完成啦！' : '叽叽——点我一下';
+  stage.appendChild(birdEl);
+  birdEl.style.left = x + 'px'; birdEl.style.top = y + 'px';
+  if (!reducedMotion() && !document.body.classList.contains('power-save')) {
+    birdEl.animate([
+      { transform: 'translate(-90px, -70px) rotate(-16deg)', opacity: 0 },
+      { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+    ], { duration: 900, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)' });
+  }
+  playChirp(0.2);
+  birdEl.addEventListener('click', () => birdFliesAway());
+  birdLeaveTimer = setTimeout(() => birdFliesAway(), withSeed ? 60000 : 26000 + Math.random() * 14000);
+}
+function birdFliesAway() {
+  if (birdLeaveTimer) { clearTimeout(birdLeaveTimer); birdLeaveTimer = null; }
+  if (!birdEl) return;
+  const el = birdEl; birdEl = null;
+  if (reducedMotion() || document.body.classList.contains('power-save')) { el.remove(); return; }
+  try { playChirp(0.16); } catch { /* ignore */ }
+  el.animate([
+    { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+    { transform: 'translate(140px, -90px) rotate(12deg)', opacity: 0 },
+  ], { duration: 800, easing: 'cubic-bezier(0.5, 0, 0.8, 0.6)' }).finished.then(() => el.remove()).catch(() => el.remove());
+}
+function birdBringsSeed() {
+  const today = new Date().toISOString().slice(0, 10);
+  api.send('settings:set', { key: 'sunSeedDate', value: today });
+  attachSeed();
+  spawnBird(true);
+}
+function attachSeed() {
+  let seed = document.getElementById('ropeSeed');
+  if (!seed) {
+    seed = document.createElement('div');
+    seed.id = 'ropeSeed';
+    seed.title = '太阳种子 · 今天所有待办都完成了';
+    stage.appendChild(seed);
+  }
+  seed.style.left = Math.round(width - 58) + 'px';
+  seed.style.top = Math.round(L.ropeY(width - 58, width) - 14) + 'px';
+}
+function showSeedIfToday() {
+  if (document.body.dataset.sunSeed === new Date().toISOString().slice(0, 10)) attachSeed();
+}
+// 随机来访：绳展开状态下每 3.5-8 分钟一次机会
+(function scheduleBirdVisit() {
+  setTimeout(() => {
+    if (document.getElementById('stage').classList.contains('revealed') && !birdEl && !document.hidden) spawnBird(false);
+    scheduleBirdVisit();
+  }, 210000 + Math.random() * 260000);
+})();
+
+// —— 每日发现卡：好书/电影/音乐/格言/知识点，5 分钟自动轮换，点击换一条 ——
+function ensureDiscoverSlot() {
+  if (discoverSlotEl) return;
+  discoverSlotEl = document.createElement('div');
+  discoverSlotEl.className = 'slot arrived discover-slot';
+  discoverSlotEl.innerHTML = '<div class="arrive" style="transform:none;opacity:1"><div class="swing"><div class="peg"></div><div class="cardfx glass discover-fx"><div class="disc-holder"></div></div></div></div>';
+  discoverSlotEl.addEventListener('click', () => { discoverIdx++; renderDiscover(); try { playBlip(0.15); } catch { /* ignore */ } });
+  cardsEl.appendChild(discoverSlotEl);
+  renderDiscover();
+}
+function renderDiscover() {
+  if (!discoverSlotEl) return;
+  const entry = window.DISCOVER.current(discoverIdx);
+  const holder = discoverSlotEl.querySelector('.disc-holder');
+  holder.innerHTML = window.DISCOVER.cardHTML(entry);
+  if (!reducedMotion() && !document.body.classList.contains('power-save') && holder.animate) {
+    holder.animate([{ transform: 'rotateY(70deg)', opacity: 0.4 }, { transform: 'rotateY(0deg)', opacity: 1 }], { duration: 360, easing: 'ease-out' });
+  }
+}
+function updateDiscover() {
+  ensureDiscoverSlot();
+  let x;
+  if (track) {
+    x = track.addX + L.RATIOS.wide.rope.w + TRACK_GAP + 80;
+  } else {
+    // 紧凑布局：紧跟添加卡之后留足间距，贴边放不下就隐藏（轨道模式始终可见）
+    const addX = L.xAt(state.items.length, state.items.length + 1, width);
+    x = addX + Math.max(240, L.dynamicSpacing(1, width));
+    if (x + 90 > width - 6) { discoverSlotEl.style.display = 'none'; return; }
+  }
+  discoverSlotEl.style.display = '';
+  discoverSlotEl.style.left = (x - 75) + 'px';
+  discoverSlotEl.style.top = (L.ropeY(x - scrollX, width) - L.PIN_ABOVE) + 'px';
+}
+setInterval(() => { discoverIdx++; renderDiscover(); }, 300000);
+showSeedIfToday();

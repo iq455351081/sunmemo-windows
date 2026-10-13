@@ -277,6 +277,7 @@ app.whenReady().then(async () => {
     // R146: 重启后回推持久化字号档，否则 line 端 Ctrl+滚轮只会读到默认 md。
     try { lineWin.webContents.executeJavaScript(`document.body.dataset.font = '${store.settings.cardFont || 'md'}'`).catch(() => {}); } catch { /* ignore */ }
     try { lineWin.webContents.executeJavaScript(`document.body.classList.toggle('imgzoom', ${store.settings.imgZoom !== false})`).catch(() => {}); } catch { /* ignore */ }
+    try { lineWin.webContents.executeJavaScript(`document.body.dataset.sunSeed = '${store.settings.sunSeedDate || ''}'`).catch(() => {}); } catch { /* ignore */ }
     if (!store.settings.welcomed && !isShots) {
       setTimeout(() => showWelcome(), 1200);
     }
@@ -892,6 +893,51 @@ function showPreview(id) {
   });
 }
 
+// v1.7 时光晾衣绳：归档便签按周回忆板（overlay 承载），点击卡片恢复上绳
+function showMemory() {
+  if (!sync || !overlayWin || overlayWin.isDestroyed()) return;
+  closePreview();
+  closeDocPeek();
+  const groups = new Map();
+  sync.archived.forEach((m, i) => {
+    const d = new Date(m.tornDownAt || m.createdAt || Date.now());
+    if (isNaN(d.getTime())) return;
+    const day = (d.getDay() + 6) % 7; // 周一为一周之始
+    const ws = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    const key = ws.getFullYear() + '-' + String(ws.getMonth() + 1).padStart(2, '0') + '-' + String(ws.getDate()).padStart(2, '0');
+    if (!groups.has(key)) {
+      groups.set(key, { label: (ws.getMonth() + 1) + ' 月 ' + ws.getDate() + ' 那一周', items: [] });
+    }
+    const g = groups.get(key);
+    if (g.items.length < 40) {
+      const cd = new Date(m.createdAt || m.tornDownAt);
+      g.items.push({ i, text: m.text || '', color: m.color || 'yellow', isDone: !!m.isDone, date: (cd.getMonth() + 1) + '月' + cd.getDate() + '日' });
+    }
+  });
+  const weeks = [...groups.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, 12)
+    .map(([key, g]) => ({ key, label: g.label, items: g.items }));
+  const d = lastLineDisplay || screen.getPrimaryDisplay();
+  overlayFit = { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height };
+  overlayWin.setBounds(overlayFit);
+  if (!overlayWin.isVisible()) overlayWin.showInactive();
+  overlayWin.webContents.send('show-memory', { weeks, count: sync.archived.length });
+}
+ipcMain.on('memory:open', () => showMemory());
+ipcMain.on('line:memory', () => showMemory()); // 命令面板入口（line 端通道）
+ipcMain.on('memory:restore', (_e, idx) => {
+  const id = store.restoreArchived(Number(idx));
+  if (id != null) {
+    store.play('tink', 0.35);
+    broadcast();
+    if (overlayWin && !overlayWin.isDestroyed() && overlayWin.isVisible()) showMemory(); // 回忆板刷新（该条已离场）
+  }
+});
+ipcMain.on('memory:close', () => {
+  if (!previewOpen && !docPeekOpen && overlayWin && !overlayWin.isDestroyed() && overlayWin.isVisible()) overlayWin.hide();
+});
+
 // v1.6 文档卡悬停弹出阅读（Quick Look popover）：overlay 全屏窗承载 420×600
 // 阅读面板，锚定卡片上方（底边压住卡顶，光标保持在面板内避免闪烁回环）。
 let docPeekOpen = false, docPeekSince = 0;
@@ -1100,6 +1146,7 @@ function buildTrayMenu() {
     { label: '弹窗新建便签', click: () => showQuickMemo(null) },
     { label: '搜索便签	Ctrl+Alt+F', click: showSearch },
     { label: '📊 本周统计', click: showStats },
+    { label: '🕰 时光晾衣绳', click: showMemory },
     { label: '挂上剪贴板内容', click: () => { if (!watchers.hangCurrentClipboard(store)) store.play('beep', 0.4); } },
     // R98: local picture upload — photo cards aren't screenshots-only anymore
     // (drag-drop onto the rope also works since R94).

@@ -646,6 +646,41 @@ api.on('show-doc-peek', async ({ item, panel }) => {
   } catch { /* buildReader 内部已渲染错误态 */ }
 });
 
+// ---- v1.7 时光晾衣绳：归档便签按周回忆板（点卡片恢复上绳） ----
+let memEl = null;
+api.on('show-memory', ({ weeks, count }) => {
+  if (memEl) memEl.remove();
+  memEl = document.createElement('div');
+  memEl.className = 'memory-board in';
+  const rows = weeks.length ? weeks.map(w =>
+    '<div class="mem-week"><div class="mem-week-label">🕰 ' + window.escapeHtml(w.label) + '</div>' +
+    '<div class="mem-row">' + (w.items.length ? w.items.map(it =>
+      '<div class="mem-card' + (it.isDone ? ' done' : '') + '" data-i="' + it.i + '" style="background:' + window.cardGradient(it.color) + '" title="点击放回晾衣绳">' +
+      '<div class="mem-text">' + window.escapeHtml(it.text.replace(/\s+/g, ' ').slice(0, 64)) + '</div>' +
+      '<div class="mem-date">' + window.escapeHtml(it.date) + (it.isDone ? ' · ✓ 已完成' : '') + '</div></div>').join('')
+      : '<div class="mem-empty">这一周没有留下便签</div>') + '</div></div>').join('')
+    : '<div class="mem-empty big">归档还空空的——撕下的便签会来到这里</div>';
+  memEl.innerHTML =
+    '<div class="mem-head"><span class="mem-title">🕰 时光晾衣绳</span>' +
+    '<span class="mem-count">归档 ' + count + ' 条 · 点击卡片放回绳上</span>' +
+    '<button class="mem-close" role="button" aria-label="关闭回忆板">✕</button></div>' +
+    '<div class="mem-scroll">' + rows + '</div>';
+  document.body.appendChild(memEl);
+  const close = () => { if (memEl) { memEl.remove(); memEl = null; } api.send('memory:close'); };
+  memEl.querySelector('.mem-close').addEventListener('click', close);
+  memEl.addEventListener('click', ev => {
+    const card = ev.target.closest('.mem-card');
+    if (!card) return;
+    api.send('memory:restore', Number(card.dataset.i));
+    card.classList.add('restored');
+    card.title = '已放回晾衣绳 ✓';
+  });
+  memEl.querySelector('.mem-close').addEventListener('click', close);
+  document.addEventListener('keydown', function memEsc(ev) {
+    if (ev.key === 'Escape' && memEl) { memEl.remove(); memEl = null; api.send('memory:close'); document.removeEventListener('keydown', memEsc, true); }
+  }, true);
+});
+
 // 点面板外 = 关闭（粘性阅读的唯一点击出口；滚绳/Esc/✕ 亦然）
 document.addEventListener('mousedown', ev => {
   if (!peekEl) return;

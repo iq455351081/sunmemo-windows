@@ -263,7 +263,8 @@ class LineStore {
 
     const id = uuid();
     const tilt = rand(-2.5, 2.5);
-    const memo = { text: trimmed, color, isDone: false, createdAt: new Date().toISOString(), aspectRatio, source };
+    const nowIso = new Date().toISOString();
+    const memo = { text: trimmed, color, isDone: false, createdAt: nowIso, aspectRatio, source, touchedAt: nowIso };
     fs.mkdirSync(this.memosFolder, { recursive: true });
     const file = path.join(this.memosFolder, `memo_${id}.json`);
     fs.writeFileSync(file, JSON.stringify({ id, tilt, ...memo }, null, 2));
@@ -292,6 +293,7 @@ class LineStore {
     item.memo.text = trimmed;
     if (color) item.memo.color = color;
     if (aspectRatio) item.memo.aspectRatio = aspectRatio;
+    item.memo.touchedAt = new Date().toISOString(); // 晒褪色计时重置：交互即恢复鲜艳
     this.writeMemoFile(item);
     this.save();
   }
@@ -309,6 +311,7 @@ class LineStore {
     const item = this.find(id);
     if (!item || item.kind !== 'memo') return;
     item.memo.isDone = !item.memo.isDone;
+    item.memo.touchedAt = new Date().toISOString();
     this.writeMemoFile(item);
     this.save();
     if (item.memo.isDone) this.play('pop', 0.25);
@@ -320,6 +323,7 @@ class LineStore {
     const result = toggleTodoLine(item.memo.text, lineIndex);
     item.memo.text = result.newText;
     item.memo.isDone = result.allDone;
+    item.memo.touchedAt = new Date().toISOString();
     this.writeMemoFile(item);
     this.save();
     this.play('pop', 0.25);

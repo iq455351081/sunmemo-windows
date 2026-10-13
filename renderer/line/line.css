@@ -747,3 +747,55 @@ body.panning * { cursor: grabbing !important; }
 @media (prefers-reduced-motion: reduce) {
   .doc-face, .doc-page1, .scroll-edge { transition: none; }
 }
+
+/* ---- v1.7 晒褪色：晾了几天没动的便签被太阳晒旧，交互恢复鲜艳 ---- */
+.memo-face.age-1 { filter: saturate(0.72) brightness(1.045); }
+.memo-face.age-2 { filter: saturate(0.45) brightness(1.09); }
+.memo-face.age-1, .memo-face.age-2 { transition: filter 500ms ease; }
+
+/* ---- v1.7 每日发现卡（绳尾）---- */
+.discover-slot { z-index: 5; }
+.disc-holder { position: relative; width: 150px; cursor: pointer; }
+.discover-card {
+  border-radius: 12px;
+  padding: 8px 10px 6px;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  display: flex; flex-direction: column; gap: 3px;
+  min-height: 108px;
+}
+.discover-card:hover { filter: brightness(1.06); }
+.dc-top { display: flex; align-items: center; gap: 5px; }
+.dc-top svg { width: 18px; height: 18px; }
+.dc-cat { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.92; }
+.dc-title { font-size: 11.5px; font-weight: 700; line-height: 1.25; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
+.dc-by { font-size: 9.5px; opacity: 0.85; }
+.dc-line { font-size: 10px; line-height: 1.45; opacity: 0.95; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dc-foot { font-size: 8.5px; opacity: 0.7; margin-top: 2px; letter-spacing: 0.05em; }
+
+/* ---- v1.7 绳上小鸟与太阳种子 ---- */
+#ropeBird { transition: left 240ms ease; }
+#ropeBird:hover svg { transform: scale(1.08); transform-origin: bottom center; }
+.bird-seed {
+  position: absolute; left: -4px; top: -16px;
+  width: 12px; height: 12px; border-radius: 50% 50% 50% 4px;
+  background: radial-gradient(circle at 32% 30%, #fff3c4, #ffb14a 65%, #ff8f1f);
+  box-shadow: 0 0 10px 3px rgba(255, 176, 74, 0.65);
+}
+#ropeSeed {
+  position: absolute; z-index: 5500;
+  width: 14px; height: 14px; border-radius: 50% 50% 50% 4px;
+  background: radial-gradient(circle at 32% 30%, #fff3c4, #ffb14a 65%, #ff8f1f);
+  box-shadow: 0 0 12px 4px rgba(255, 176, 74, 0.6);
+  animation: seedGlow 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes seedGlow {
+  0%, 100% { box-shadow: 0 0 10px 3px rgba(255, 176, 74, 0.5); }
+  50% { box-shadow: 0 0 16px 6px rgba(255, 176, 74, 0.75); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #ropeSeed { animation: none; }
+}
+.discover-slot .cardfx { background: none; box-shadow: none; padding: 0; backdrop-filter: none; }
+.discover-slot .disc-holder { margin: 0; }
