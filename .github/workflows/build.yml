@@ -1,0 +1,27 @@
+name: Build SunMemo Windows
+on:
+  workflow_dispatch: # ✅ 允许网页手动点击运行（重点！）
+jobs:
+  build:
+    runs-on: windows-latest # 使用GitHub云端Windows虚拟机编译
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 安装项目依赖
+        run: npm install
+
+      - name: 打包Windows安装包
+        run: npm run build:win
+
+      - name: 上传打包产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: SunMemo-Windows-Build
+          path: dist/**
